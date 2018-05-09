@@ -1,15 +1,17 @@
 import keras as K
 import numpy as np
 
-
-input_shape = None
-batch_shape = None
+n = 1000000             # number of examples
+b_n = 512               # batch size
+input_shape = (n, 1)
+batch_shape = (b_n, 1)
 e_n = 16                # embedding size
-c_n = input_shape[1]    # num class codes
+c_n = 200000            # num class codes
 y_n = 1
 
-x1 = K.layers.Input(shape=input_shape, batch_shape=batch_shape, name="x1", sparse=True)
-x2 = K.layers.Input(shape=input_shape, batch_shape=batch_shape, name="x2", sparse=True)
+# inputs must be the index of each class, NOT a one-hot vector
+x1 = K.layers.Input(shape=input_shape, batch_shape=batch_shape, dtype=np.int, name="x1")
+x2 = K.layers.Input(shape=input_shape, batch_shape=batch_shape, dtype=np.int, name="x2")
 
 encoder = K.layers.Embedding(c_n, e_n, activation="tanh")
 
