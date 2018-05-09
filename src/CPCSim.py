@@ -17,8 +17,7 @@ e1 = encoder(x1)
 e2 = encoder(x2)
 
 X = K.layers.merge([e1, e2], 'concat', -1)
-
-X = K.layers.Dense(y_n, activation='sigmoid')
+X = K.layers.Dense(y_n, activation='sigmoid')(X)
 
 model = K.models.Model(inputs=[x1, x2], outputs=X)
 
