@@ -112,20 +112,22 @@ def train(model, hidden_units_post_attention, inputs, outputs, epochs=1):
 
 
 # example usage
-input_sequence_length = 30
-input_feature_length = 10
-output_sequence_length = 30
-output_feature_length = 10
+input_sequence_length = 4
+input_feature_length = 3
+output_sequence_length = 4
+output_feature_length = 3
 hidden_units_pre_attention = 32
 hidden_units_post_attention = 64
 attention_model = attention_model(input_sequence_length, input_feature_length,
                                   output_sequence_length, output_feature_length,
                                   n_a=hidden_units_pre_attention, n_s=hidden_units_post_attention,
+                                  e1=20,e2=20,
+                                  optimizer=K.optimizers.adam(0.01),
                                   loss="mean_squared_error")
 
-X = np.random.uniform(0,1, (1000, input_sequence_length, input_feature_length))
-Y = (X+1)/2
-
+X = np.random.uniform(0, 1, (100000, input_sequence_length, input_feature_length)) > 0.5
+Y = X.copy()
+print(Y[0:10])
 print(attention_model.summary())
 
 # train
