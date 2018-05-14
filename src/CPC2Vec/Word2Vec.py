@@ -42,7 +42,7 @@ def load_cpc_to_index_map():
 
 
 load_previous_model = True
-learning_rate = 0.001
+learning_rate = 0.0001
 vocab_size = 259840
 vector_dim = 64
 batch_size = 512
