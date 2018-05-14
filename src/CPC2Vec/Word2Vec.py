@@ -47,10 +47,10 @@ def load_cpc_to_index_map():
     return cpc_to_index_map
 
 
-def load_model(load_previous):
+def load_word2vec_model(load_previous, lr=0.001, loss_func='mean_squared_error'):
     if load_previous:
         print("Using previous model...")
-        return k.models.load_model(model_file)
+        m = k.models.load_model(model_file, compile=False)
     else:
         # create some input variables
         input_target = Input((1,))
@@ -73,12 +73,13 @@ def load_model(load_previous):
         output = Dense(1, activation='sigmoid')(dot_product)
         # create the primary training model
         m = Model(input=[input_target, input_context], output=output)
-        m.compile(loss='mean_squared_error', optimizer=Adam(lr=0.001), metrics=['accuracy'])
-        return m
+    m.compile(loss=loss_func, optimizer=Adam(lr=lr), metrics=['accuracy'])
+    return m
 
 
 load_previous_model = True
-model = load_model(load_previous_model)
+learning_rate = 0.0001
+model = load_word2vec_model(load_previous_model, learning_rate)
 print("Model compiled.")
 
 vocab_size = 259840
