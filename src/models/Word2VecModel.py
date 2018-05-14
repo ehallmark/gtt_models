@@ -65,7 +65,7 @@ class Word2Vec:
         if self.model is None:
             self.model = create_word2vec_model(embedding_size, vocab_size, lr=lr, loss_func=loss_func)
 
-    def train(self, inputs, outputs, val_data, epochs=1, shuffle=True, callbacks=[]):
+    def train(self, inputs, outputs, val_data, epochs=1, shuffle=True, callbacks=None):
         for cnt in range(epochs):
             self.model.fit(inputs, outputs, verbose=1, batch_size=self.batch_size,
                            validation_data=val_data, shuffle=shuffle, callbacks=callbacks)
