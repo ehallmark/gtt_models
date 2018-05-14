@@ -1,13 +1,7 @@
-from keras.models import Model
-from keras.layers import Input, Dense, Reshape, Dot, Dropout
-from keras.layers.embeddings import Embedding
 import pandas as pd
-from keras.optimizers import RMSprop, Adam
-from keras.initializers import RandomUniform
 import psycopg2
 import numpy as np
-import keras as k
-
+from src.Word2Vec.Word2VecModel import Word2Vec
 
 model_file = '/home/ehallmark/data/python/cpc_similarity_model_keras_word2vec_64.h5'
 
@@ -47,46 +41,17 @@ def load_cpc_to_index_map():
     return cpc_to_index_map
 
 
-def load_word2vec_model(load_previous, lr=0.001, loss_func='mean_squared_error'):
-    if load_previous:
-        print("Using previous model...")
-        m = k.models.load_model(model_file, compile=False)
-    else:
-        # create some input variables
-        input_target = Input((1,))
-        input_context = Input((1,))
-
-        embedding = Embedding(vocab_size, vector_dim, input_length=1, name='embedding',
-                              embeddings_initializer=RandomUniform(-0.1, 0.1),
-                              )
-        target = embedding(input_target)
-        target = Reshape((vector_dim, 1))(target)
-        context = embedding(input_context)
-        context = Reshape((vector_dim, 1))(context)
-        # setup a cosine similarity operation which will be output in a secondary model
-        similarity = Dot(0, True)([target, context])
-
-        # now perform the dot product operation to get a similarity measure
-        dot_product = Dot(1, False)([target, context])
-        dot_product = Reshape((1,))(dot_product)
-        # add the sigmoid output layer
-        output = Dense(1, activation='sigmoid')(dot_product)
-        # create the primary training model
-        m = Model(input=[input_target, input_context], output=output)
-    m.compile(loss=loss_func, optimizer=Adam(lr=lr), metrics=['accuracy'])
-    return m
-
-
 load_previous_model = True
-learning_rate = 0.0001
-model = load_word2vec_model(load_previous_model, learning_rate)
-print("Model compiled.")
-
+learning_rate = 0.001
 vocab_size = 259840
-
 vector_dim = 64
 batch_size = 512
 epochs = 1
+
+word2vec = Word2Vec(model_file, load_previous_model=load_previous_model, batch_size=batch_size,
+                    embedding_size=vector_dim, lr=learning_rate, loss_func='mean_squared_error')
+
+print("Model compiled.")
 
 valid_size = 16     # Random set of words to evaluate similarity on.
 valid_window = 100  # Only pick dev samples in the head of the distribution.
@@ -97,41 +62,7 @@ dictionary, reverse_dictionary = build_dictionaries()
 ((word_target, word_context), labels) = data
 ((val_target, val_context), val_labels) = val_data
 
-
-class SimilarityCallback:
-    def run_sim(self):
-        for i in range(valid_size):
-            valid_word = reverse_dictionary[valid_examples[i]]
-            top_k = 8  # number of nearest neighbors
-            sim = self._get_sim(valid_examples[i])
-            nearest = (-sim).argsort()[1:top_k + 1]
-            log_str = 'Nearest to %s:' % valid_word
-            for k in range(top_k):
-                close_word = reverse_dictionary[nearest[k]]
-                log_str = '%s %s,' % (log_str, close_word)
-            print(log_str)
-
-    @staticmethod
-    def _get_sim(valid_word_idx):
-        sim = np.zeros((vocab_size,))
-        in_arr1 = np.zeros((1,))
-        in_arr2 = np.zeros((1,))
-        in_arr1[0,] = valid_word_idx
-        for i in range(vocab_size):
-            in_arr2[0,] = i
-            out = model.predict_on_batch([in_arr1, in_arr2])
-            sim[i] = out
-        return sim
-
-
-sim_cb = SimilarityCallback()
-
-for cnt in range(epochs):
-    loss = model.fit([word_target, word_context], labels, verbose=1, batch_size=batch_size,
-                     validation_data=([val_target, val_context], val_labels), shuffle=True)
-    print("Epoch {}, loss={}".format(cnt, loss))
-
+word2vec.train([word_target, word_context], labels, ([val_target, val_context], val_labels),
+               epochs=epochs, shuffle=True)
 # save
-model.save(model_file)
-# sample
-sim_cb.run_sim()
+word2vec.save()
