@@ -49,8 +49,8 @@ def load_cpc_to_index_map():
 vocab_size = 259840
 
 vector_dim = 64
-batch_size = 512
-epochs = 10
+batch_size = 1024
+epochs = 1
 
 valid_size = 16     # Random set of words to evaluate similarity on.
 valid_window = 100  # Only pick dev samples in the head of the distribution.
@@ -81,7 +81,7 @@ dot_product = Reshape((1,))(dot_product)
 output = Dense(1, activation='sigmoid')(dot_product)
 # create the primary training model
 model = Model(input=[input_target, input_context], output=output)
-model.compile(loss='mean_squared_error', optimizer=Adam(lr=0.001, decay=0.0001), metrics=['accuracy'])
+model.compile(loss='mean_squared_error', optimizer=Adam(lr=0.0001), metrics=['accuracy'])
 
 # create a secondary validation model to run our similarity checks during training
 validation_model = Model(input=[input_target, input_context], output=similarity)
