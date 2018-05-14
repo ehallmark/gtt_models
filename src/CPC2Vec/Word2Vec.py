@@ -8,8 +8,7 @@ import psycopg2
 import numpy as np
 
 
-model_file = 'cpc_similarity_model_keras_word2vec_64.h5'
-
+model_file = '/home/ehallmark/data/python/cpc_similarity_model_keras_word2vec_64.h5'
 
 def build_dictionaries():
     """Process raw inputs into a dataset."""
