@@ -2,7 +2,7 @@ import pandas as pd
 import psycopg2
 import numpy as np
 from keras.callbacks import LearningRateScheduler
-from src.Word2Vec.Word2VecModel import Word2Vec
+from src.models.Word2VecModel import Word2Vec
 
 model_file = '/home/ehallmark/data/python/cpc_similarity_model_keras_word2vec_64.h5'
 
@@ -50,7 +50,7 @@ batch_size = 512
 epochs = 3
 
 word2vec = Word2Vec(model_file, load_previous_model=load_previous_model, vocab_size=vocab_size, batch_size=batch_size,
-                    loss_func='binary_crossentropy',
+                    loss_func='mean_squared_error',
                     embedding_size=vector_dim, lr=learning_rate)
 
 print("Model compiled.")
