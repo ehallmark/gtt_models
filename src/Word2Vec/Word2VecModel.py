@@ -3,7 +3,9 @@ from keras.layers import Input, Dense, Reshape, Dot
 from keras.layers.embeddings import Embedding
 from keras.optimizers import Adam
 from keras.initializers import RandomUniform
+from keras.callbacks import LearningRateScheduler
 import keras as k
+
 
 
 def load_word2vec_model(model_file, lr=0.001,
@@ -54,7 +56,7 @@ class Word2Vec:
         self.lr = lr
         self.callback = callback
         self.embeddings_initializer = embeddings_initializer
-
+        self.model = None
         if load_previous_model:
             try:
                 self.load()
@@ -63,10 +65,10 @@ class Word2Vec:
         if self.model is None:
             self.model = create_word2vec_model(embedding_size, vocab_size, lr=lr, loss_func=loss_func)
 
-    def train(self, inputs, outputs, val_data, epochs=1, shuffle=True):
+    def train(self, inputs, outputs, val_data, epochs=1, shuffle=True, callbacks=[]):
         for cnt in range(epochs):
             self.model.fit(inputs, outputs, verbose=1, batch_size=self.batch_size,
-                           validation_data=val_data, shuffle=shuffle)
+                           validation_data=val_data, shuffle=shuffle, callbacks=callbacks)
             if self.callback is not None:
                 self.callback()
 

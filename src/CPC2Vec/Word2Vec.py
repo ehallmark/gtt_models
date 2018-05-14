@@ -1,6 +1,7 @@
 import pandas as pd
 import psycopg2
 import numpy as np
+from keras.callbacks import LearningRateScheduler
 from src.Word2Vec.Word2VecModel import Word2Vec
 
 model_file = '/home/ehallmark/data/python/cpc_similarity_model_keras_word2vec_64.h5'
@@ -41,28 +42,27 @@ def load_cpc_to_index_map():
     return cpc_to_index_map
 
 
-load_previous_model = True
-learning_rate = 0.0001
+load_previous_model = False
+learning_rate = 0.005
 vocab_size = 259840
 vector_dim = 64
 batch_size = 512
-epochs = 1
+epochs = 3
 
-word2vec = Word2Vec(model_file, load_previous_model=load_previous_model, batch_size=batch_size,
-                    embedding_size=vector_dim, lr=learning_rate, loss_func='mean_squared_error')
+word2vec = Word2Vec(model_file, load_previous_model=load_previous_model, vocab_size=vocab_size, batch_size=batch_size,
+                    loss_func='binary_crossentropy',
+                    embedding_size=vector_dim, lr=learning_rate)
 
 print("Model compiled.")
-
-valid_size = 16     # Random set of words to evaluate similarity on.
-valid_window = 100  # Only pick dev samples in the head of the distribution.
-valid_examples = np.random.choice(valid_window, valid_size, replace=False)
 
 (data, val_data) = load_cpc_data()
 dictionary, reverse_dictionary = build_dictionaries()
 ((word_target, word_context), labels) = data
 ((val_target, val_context), val_labels) = val_data
 
+scheduler = LearningRateScheduler(lambda n: learning_rate/max(1, n*5))
+
 word2vec.train([word_target, word_context], labels, ([val_target, val_context], val_labels),
-               epochs=epochs, shuffle=True)
+               epochs=epochs, shuffle=True, callbacks=[scheduler])
 # save
 word2vec.save()
