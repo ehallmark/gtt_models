@@ -6,6 +6,7 @@ from keras.optimizers import RMSprop, Adam
 from keras.initializers import RandomUniform
 import psycopg2
 import numpy as np
+import keras as k
 
 
 model_file = '/home/ehallmark/data/python/cpc_similarity_model_keras_word2vec_64.h5'
@@ -46,10 +47,44 @@ def load_cpc_to_index_map():
     return cpc_to_index_map
 
 
+def load_model(load_previous):
+    if load_previous:
+        print("Using previous model...")
+        return k.models.load_model(model_file)
+    else:
+        # create some input variables
+        input_target = Input((1,))
+        input_context = Input((1,))
+
+        embedding = Embedding(vocab_size, vector_dim, input_length=1, name='embedding',
+                              embeddings_initializer=RandomUniform(-0.1, 0.1),
+                              )
+        target = embedding(input_target)
+        target = Reshape((vector_dim, 1))(target)
+        context = embedding(input_context)
+        context = Reshape((vector_dim, 1))(context)
+        # setup a cosine similarity operation which will be output in a secondary model
+        similarity = Dot(0, True)([target, context])
+
+        # now perform the dot product operation to get a similarity measure
+        dot_product = Dot(1, False)([target, context])
+        dot_product = Reshape((1,))(dot_product)
+        # add the sigmoid output layer
+        output = Dense(1, activation='sigmoid')(dot_product)
+        # create the primary training model
+        m = Model(input=[input_target, input_context], output=output)
+        m.compile(loss='mean_squared_error', optimizer=Adam(lr=0.001), metrics=['accuracy'])
+        return m
+
+
+load_previous_model = True
+model = load_model(load_previous_model)
+print("Model compiled.")
+
 vocab_size = 259840
 
 vector_dim = 64
-batch_size = 1024
+batch_size = 512
 epochs = 1
 
 valid_size = 16     # Random set of words to evaluate similarity on.
@@ -60,31 +95,6 @@ valid_examples = np.random.choice(valid_window, valid_size, replace=False)
 dictionary, reverse_dictionary = build_dictionaries()
 ((word_target, word_context), labels) = data
 ((val_target, val_context), val_labels) = val_data
-# create some input variables
-input_target = Input((1,))
-input_context = Input((1,))
-
-embedding = Embedding(vocab_size, vector_dim, input_length=1, name='embedding',
-                      embeddings_initializer=RandomUniform(-0.1, 0.1),
-                      )
-target = embedding(input_target)
-target = Reshape((vector_dim, 1))(target)
-context = embedding(input_context)
-context = Reshape((vector_dim, 1))(context)
-# setup a cosine similarity operation which will be output in a secondary model
-similarity = Dot(0, True)([target, context])
-
-# now perform the dot product operation to get a similarity measure
-dot_product = Dot(1, False)([target, context])
-dot_product = Reshape((1,))(dot_product)
-# add the sigmoid output layer
-output = Dense(1, activation='sigmoid')(dot_product)
-# create the primary training model
-model = Model(input=[input_target, input_context], output=output)
-model.compile(loss='mean_squared_error', optimizer=Adam(lr=0.0001), metrics=['accuracy'])
-
-# create a secondary validation model to run our similarity checks during training
-validation_model = Model(input=[input_target, input_context], output=similarity)
 
 
 class SimilarityCallback:
@@ -108,7 +118,7 @@ class SimilarityCallback:
         in_arr1[0,] = valid_word_idx
         for i in range(vocab_size):
             in_arr2[0,] = i
-            out = validation_model.predict_on_batch([in_arr1, in_arr2])
+            out = model.predict_on_batch([in_arr1, in_arr2])
             sim[i] = out
         return sim
 
