@@ -81,7 +81,7 @@ for i in range(epochs):
     labels_sample = labels.sample(n=sampling_per_epoch, replace=True, seed=i)
     n = 0
     for word2vec in models:
-        history = word2vec.train([word_target_sample, word_context], labels, ([val_target, val_context], val_labels),
+        history = word2vec.train([word_target_sample, word_context_sample], labels_sample, ([val_target, val_context], val_labels),
                              epochs=epochs, shuffle=True, callbacks=None)
         print("History for model "+str(n)+": ", history)
         n = n + 1
