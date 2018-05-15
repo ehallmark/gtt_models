@@ -60,7 +60,7 @@ embedding_size_to_file_map = {
 
 scheduler = LearningRateScheduler(lambda n: learning_rate/(max(1, n*5)))
 
-(data, val_data) = load_cpc_data(randomize=True, sample_frac=0.5)
+(data, val_data) = load_cpc_data(randomize=True)
 dictionary, reverse_dictionary = build_dictionaries()
 ((word_target, word_context), labels) = data
 ((val_target, val_context), val_labels) = val_data
