@@ -5,7 +5,7 @@ from keras.models import Model
 
 
 def attention_model(Tx, Fx, Ty, Fy, n_a=64, n_s=32, e1=10, e2=1, activation="tanh",
-                    loss='categorical_crossentropy', optimizer="adam"):
+                    loss='categorical_crossentropy', optimizer=K.optimizers.Adam()):
 
     # Defined shared layers as global variables
     repeator = RepeatVector(Tx)
@@ -122,7 +122,7 @@ attention_model = attention_model(input_sequence_length, input_feature_length,
                                   output_sequence_length, output_feature_length,
                                   n_a=hidden_units_pre_attention, n_s=hidden_units_post_attention,
                                   e1=20,e2=20,
-                                  optimizer=K.optimizers.adam(0.01),
+                                  optimizer=K.optimizers.adam(0.001),
                                   loss="mean_squared_error")
 
 X = np.random.uniform(0, 1, (100000, input_sequence_length, input_feature_length)) > 0.5
