@@ -70,7 +70,7 @@ models = []
 for vector_dim, model_file in embedding_size_to_file_map.items():
     word2vec = Word2Vec(model_file, load_previous_model=load_previous_model, vocab_size=vocab_size,
                         batch_size=batch_size, loss_func='mean_squared_error',
-                        embedding_size=vector_dim, decay=None, lr=learning_rate)
+                        embedding_size=vector_dim, lr=learning_rate)
     models.append(word2vec)
 
 print("Models compiled.")

@@ -25,7 +25,7 @@ def attention_model(Tx, Fx, Ty, Fy, n_a=64, n_s=32, e1=10, e2=1, activation="tan
         s_prev -- previous hidden state of the (post-attention) LSTM, numpy-array of shape (m, n_s)
 
         Returns:
-        context -- context vector, input of the next (post-attetion) LSTM cell
+        context -- context vector, input of the next (post-attention) LSTM cell
         """
 
         # Use repeator to repeat s_prev to be of shape (m, Tx, n_s) so that you can concatenate it with all hidden states "a" (≈ 1 line)

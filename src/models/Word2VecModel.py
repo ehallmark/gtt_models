@@ -46,7 +46,7 @@ def create_word2vec_model(embedding_size, vocab_size,
 
 class Word2Vec:
     def __init__(self, filepath, load_previous_model=True, batch_size=512, embedding_size=64,
-                 vocab_size=None, lr=0.001, decay=None,
+                 vocab_size=None, lr=0.001, decay=0.0,
                  loss_func='mean_squared_error', embeddings_initializer=RandomUniform(-0.1, 0.1),
                  callback=None):
         self.filepath = filepath
