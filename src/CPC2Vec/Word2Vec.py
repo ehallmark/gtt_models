@@ -71,18 +71,9 @@ for vector_dim, model_file in embedding_size_to_file_map.items():
     word2vec = Word2Vec(model_file, load_previous_model=load_previous_model, vocab_size=vocab_size,
                         batch_size=batch_size, loss_func='mean_squared_error',
                         embedding_size=vector_dim, lr=learning_rate)
-    models.append(word2vec)
-
-print("Models compiled.")
-for i in range(epochs):
-    n = 0
-    for word2vec in models:
-        history = word2vec.train([word_target, word_context], labels, ([val_target, val_context], val_labels),
+    print("Starting to train model with embedding_size: ", vector_dim)
+    history = word2vec.train([word_target, word_context], labels, ([val_target, val_context], val_labels),
                              epochs=epochs, shuffle=True, callbacks=[scheduler])
-        print("History for model "+str(n)+": ", history)
-        n = n + 1
-
-print("Saving models...")
-for word2vec in models:
-    # save
+    print("History for model: ", history)
     word2vec.save()
+
