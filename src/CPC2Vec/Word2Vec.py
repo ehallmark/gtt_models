@@ -4,8 +4,9 @@ import numpy as np
 from keras.callbacks import LearningRateScheduler
 from src.models.Word2VecModel import Word2Vec
 
-model_file = '/home/ehallmark/data/python/cpc_similarity_model_keras_word2vec_64.h5'
-
+model_file_64 = '/home/ehallmark/data/python/cpc_similarity_model_keras_word2vec_64.h5'
+model_file_32 = '/home/ehallmark/data/python/cpc_similarity_model_keras_word2vec_32.h5'
+model_file_128 = '/home/ehallmark/data/python/cpc_similarity_model_keras_word2vec_128.h5'
 def build_dictionaries():
     """Process raw inputs into a dataset."""
     dictionary = load_cpc_to_index_map()
@@ -49,7 +50,7 @@ vector_dim = 64
 batch_size = 512
 epochs = 3
 
-word2vec = Word2Vec(model_file, load_previous_model=load_previous_model, vocab_size=vocab_size, batch_size=batch_size,
+word2vec = Word2Vec(model_file_128, load_previous_model=load_previous_model, vocab_size=vocab_size, batch_size=batch_size,
                     loss_func='mean_squared_error',
                     embedding_size=vector_dim, lr=learning_rate)
 
