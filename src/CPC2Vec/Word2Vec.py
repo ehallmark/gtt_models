@@ -76,9 +76,9 @@ for vector_dim, model_file in embedding_size_to_file_map.items():
 
 print("Models compiled.")
 for i in range(epochs):
-    word_target_sample = word_target.sample(n=sampling_per_epoch, replace=True, seed=i)
-    word_context_sample = word_context.sample(n=sampling_per_epoch, replace=True, seed=i)
-    labels_sample = labels.sample(n=sampling_per_epoch, replace=True, seed=i)
+    word_target_sample = word_target.sample(n=sampling_per_epoch, replace=True, random_state=i)
+    word_context_sample = word_context.sample(n=sampling_per_epoch, replace=True, random_state=i)
+    labels_sample = labels.sample(n=sampling_per_epoch, replace=True, random_state=i)
     n = 0
     for word2vec in models:
         history = word2vec.train([word_target_sample, word_context_sample], labels_sample, ([val_target, val_context], val_labels),
