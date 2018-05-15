@@ -75,7 +75,6 @@ for vector_dim, model_file in embedding_size_to_file_map.items():
     models.append(word2vec)
 
 print("Models compiled.")
-
 for i in range(epochs):
     word_target_sample = word_target.sample(n=sampling_per_epoch, replace=True, seed=i)
     word_context_sample = word_context.sample(n=sampling_per_epoch, replace=True, seed=i)
