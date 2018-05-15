@@ -85,7 +85,8 @@ def pretrained_embedding_layer(word_to_vec_map, word_to_index):
 
 
 def create_rnn_encoding_model(input_shape, word_to_vec_map, word_to_index,
-                              hidden_layer_size=256, compile=True):
+                              hidden_layer_size=256, lr=0.001, loss_func='categorial_crossentropy',
+                              compile=True):
     """
     Function creating the Emojify-v2 model's graph.
 
