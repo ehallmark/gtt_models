@@ -4,9 +4,10 @@ import numpy as np
 from keras.callbacks import LearningRateScheduler
 from src.models.Word2VecModel import Word2Vec
 
-model_file_64 = '/home/ehallmark/data/python/cpc_similarity_model_keras_word2vec_64.h5'
-model_file_32 = '/home/ehallmark/data/python/cpc_similarity_model_keras_word2vec_32.h5'
-model_file_128 = '/home/ehallmark/data/python/cpc_similarity_model_keras_word2vec_128.h5'
+
+model_file_32 = '/home/ehallmark/data/python/cpc_sim_model_keras_word2vec_32.h5'
+model_file_64 = '/home/ehallmark/data/python/cpc_sim_model_keras_word2vec_64.h5'
+model_file_128 = '/home/ehallmark/data/python/cpc_sim_model_keras_word2vec_128.h5'
 def build_dictionaries():
     """Process raw inputs into a dataset."""
     dictionary = load_cpc_to_index_map()
@@ -18,11 +19,12 @@ def build_dictionaries():
 
 
 # database
-def load_cpc_data():
+def load_cpc_data(randomize=True):
     train_file = '/home/ehallmark/Downloads/cpc_sim_data/data-0.csv'
     print("Reading dataset...")
     train_csv = pd.read_csv(train_file, header=0, sep=',', dtype=np.int32)
-    train_csv = train_csv.sample(frac=1)
+    if randomize:
+        train_csv = train_csv.sample(frac=1)
     num_test = 50000
     x_train1, x_train2, y_train = train_csv.iloc[num_test:,0], train_csv.iloc[num_test:,1], train_csv.iloc[num_test:,2]
     print("Size of dataset: ", len(train_csv))
@@ -44,26 +46,48 @@ def load_cpc_to_index_map():
 
 
 load_previous_model = False
-learning_rate = 0.005
+learning_rate = 0.01
+decay = 0.0001
 vocab_size = 259840
-vector_dim = 64
 batch_size = 512
-epochs = 3
+epochs = 200
+sampling_per_epoch = 5000000
 
-word2vec = Word2Vec(model_file_128, load_previous_model=load_previous_model, vocab_size=vocab_size, batch_size=batch_size,
-                    loss_func='mean_squared_error',
-                    embedding_size=vector_dim, lr=learning_rate)
+embedding_size_to_file_map = {
+    32: model_file_32,
+    64: model_file_64,
+    128: model_file_128
+}
 
-print("Model compiled.")
+# scheduler = LearningRateScheduler(lambda n: learning_rate/(max(1, n*5)))
 
-(data, val_data) = load_cpc_data()
+(data, val_data) = load_cpc_data(randomize=False)
 dictionary, reverse_dictionary = build_dictionaries()
 ((word_target, word_context), labels) = data
 ((val_target, val_context), val_labels) = val_data
 
-scheduler = LearningRateScheduler(lambda n: learning_rate/max(1, n*5))
 
-word2vec.train([word_target, word_context], labels, ([val_target, val_context], val_labels),
-               epochs=epochs, shuffle=True, callbacks=[scheduler])
-# save
-word2vec.save()
+models = []
+for vector_dim, model_file in embedding_size_to_file_map.items():
+    word2vec = Word2Vec(model_file, load_previous_model=load_previous_model, vocab_size=vocab_size,
+                        batch_size=batch_size, loss_func='mean_squared_error',
+                        embedding_size=vector_dim, decay=decay, lr=learning_rate)
+    models.append(word2vec)
+
+print("Models compiled.")
+
+for i in range(epochs):
+    word_target_sample = word_target.sample(n=sampling_per_epoch, replace=True, seed=i)
+    word_context_sample = word_context.sample(n=sampling_per_epoch, replace=True, seed=i)
+    labels_sample = labels.sample(n=sampling_per_epoch, replace=True, seed=i)
+    n = 0
+    for word2vec in models:
+        history = word2vec.train([word_target_sample, word_context], labels, ([val_target, val_context], val_labels),
+                             epochs=epochs, shuffle=True, callbacks=None)
+        print("History for model "+str(n)+": ", history)
+        n = n + 1
+
+print("Saving models...")
+for word2vec in models:
+    # save
+    word2vec.save()

@@ -12,7 +12,7 @@ def attention_model(Tx, Fx, Ty, Fy, n_a=64, n_s=32, e1=10, e2=1, activation="tan
     concatenator = Concatenate(axis=-1)
     densor1 = Dense(e1, activation=activation)
     densor2 = Dense(e2, activation=activation)
-    activator = Activation("softmax", name='attention_weights') # We are using a custom softmax(axis = 1) loaded in this notebook
+    activator = Activation("softmax", axis=-1, name='attention_weights') # We are using a custom softmax(axis = 1) loaded in this notebook
     dotor = Dot(axes=1)
 
     def one_step_attention(a, s_prev):

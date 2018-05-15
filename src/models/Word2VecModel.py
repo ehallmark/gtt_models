@@ -17,7 +17,7 @@ def load_word2vec_model(model_file, lr=0.001,
 
 
 def create_word2vec_model(embedding_size, vocab_size,
-                          lr=0.001, embedding_init=RandomUniform(-0.1, 0.1),
+                          optimizer=Adam(lr=0.001), embedding_init=RandomUniform(-0.1, 0.1),
                           loss_func='mean_squared_error'):
     print("Creating new model...")
     # create some input variables
@@ -40,13 +40,13 @@ def create_word2vec_model(embedding_size, vocab_size,
     output = Dense(1, activation='sigmoid')(dot_product)
     # create the primary training model
     m = Model(input=[input_target, input_context], output=output)
-    m.compile(loss=loss_func, optimizer=Adam(lr=lr), metrics=['accuracy'])
+    m.compile(loss=loss_func, optimizer=optimizer, metrics=['accuracy'])
     return m
 
 
 class Word2Vec:
     def __init__(self, filepath, load_previous_model=True, batch_size=512, embedding_size=64,
-                 vocab_size=None, lr=0.001,
+                 vocab_size=None, lr=0.001, decay=None,
                  loss_func='mean_squared_error', embeddings_initializer=RandomUniform(-0.1, 0.1),
                  callback=None):
         self.filepath = filepath
@@ -63,14 +63,15 @@ class Word2Vec:
             except:
                 print('Could not fine previous model... Creating new one now.')
         if self.model is None:
-            self.model = create_word2vec_model(embedding_size, vocab_size, lr=lr, loss_func=loss_func)
+            optimizer = Adam(lr=lr, decay=decay)
+            self.model = create_word2vec_model(embedding_size, vocab_size, optimizer=optimizer, loss_func=loss_func)
 
     def train(self, inputs, outputs, val_data, epochs=1, shuffle=True, callbacks=None):
-        for cnt in range(epochs):
-            self.model.fit(inputs, outputs, verbose=1, batch_size=self.batch_size,
-                           validation_data=val_data, shuffle=shuffle, callbacks=callbacks)
-            if self.callback is not None:
-                self.callback()
+        history = self.model.fit(inputs, outputs, verbose=0, batch_size=self.batch_size,
+                       validation_data=val_data, epochs=epochs, shuffle=shuffle, callbacks=callbacks)
+        if self.callback is not None:
+            self.callback()
+        return history
 
     def save(self):
         # save
