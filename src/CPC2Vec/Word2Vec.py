@@ -50,7 +50,7 @@ learning_rate = 0.005
 decay = 0.0001
 vocab_size = 259840
 batch_size = 512
-epochs = 2
+epochs = 1
 
 embedding_size_to_file_map = {
     32: model_file_32,
@@ -66,7 +66,7 @@ dictionary, reverse_dictionary = build_dictionaries()
 ((val_target, val_context), val_labels) = val_data
 
 
-models = []
+histories = []
 for vector_dim, model_file in embedding_size_to_file_map.items():
     word2vec = Word2Vec(model_file, load_previous_model=load_previous_model, vocab_size=vocab_size,
                         batch_size=batch_size, loss_func='mean_squared_error',
@@ -75,5 +75,9 @@ for vector_dim, model_file in embedding_size_to_file_map.items():
     history = word2vec.train([word_target, word_context], labels, ([val_target, val_context], val_labels),
                              epochs=epochs, shuffle=True, callbacks=[scheduler])
     print("History for model: ", history)
+    histories.append(history)
     word2vec.save()
+
+for i in range(len(histories)):
+    print("History "+str(i), histories[i])
 
