@@ -22,10 +22,10 @@ def get_data():
     x2_val = x2.sample(n=num_test, replace=False, random_state=seed)
     y_val = y.sample(n=num_test, replace=False, random_state=seed)
 
-    x1 = np.array(x1).reshape(x1.shape[0], 1, x1.shape[1])
-    x2 = np.array(x2).reshape(x2.shape[0], 1, x2.shape[1])
-    x1_val = np.array(x1_val).reshape(x1_val.shape[0], 1, x1_val.shape[1])
-    x2_val = np.array(x2_val).reshape(x2_val.shape[0], 1, x2_val.shape[1])
+    x1 = np.array(x1).reshape(x1.shape[0], x1.shape[1], 1)
+    x2 = np.array(x2).reshape(x2.shape[0], x2.shape[1], 1)
+    x1_val = np.array(x1_val).reshape(x1_val.shape[0], x1_val.shape[1], 1)
+    x2_val = np.array(x2_val).reshape(x2_val.shape[0], x2_val.shape[1], 1)
     return ((x1, x2), y), ([x1_val, x2_val], y_val)
 
 
@@ -61,7 +61,7 @@ if __name__ == "__main__":
                              hidden_layer_size=128, word2vec_size=word2vec_size,
                              batch_size=batch_size, loss_func='mean_squared_error',
                              embedding_size=vector_dim, lr=learning_rate,
-                             max_len=10,
+                             max_len=x1.shape[1],
                              word2vec_data=word2vec_data,
                              )
         print("Model Summary: ", encoder.model.summary())

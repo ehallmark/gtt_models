@@ -114,7 +114,7 @@ def load_rnn_encoding_model(model_file, lr=0.001,
 
 class RnnEncoder:
     def __init__(self, filepath, load_previous_model=True, word2vec_data=None, batch_size=512, word2vec_size=256,
-                 max_len=500,
+                 max_len=256,
                  hidden_layer_size=128,
                  embedding_size=64,
                  e1=16, e2=8, lr=0.001,
