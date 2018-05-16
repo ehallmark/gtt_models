@@ -1,11 +1,9 @@
-from keras.models import Model
 from keras.optimizers import Adam
 import keras as k
 import numpy as np
-np.random.seed(0)
 from keras.models import Model
-from keras.layers import Dense, Input, Dropout, LSTM, Activation
-from keras.layers.embeddings import Embedding
+from keras.layers import Dense, Input, Dropout, LSTM, Activation, Dot, Reshape, Embedding
+from src.attention.AttentionModel import AttentionModelCreator
 np.random.seed(1)
 
 
@@ -58,7 +56,7 @@ def pretrained_embedding_layer(word_to_vec_map, word_to_index):
     """
 
     vocab_len = len(word_to_index) + 1  # adding 1 to fit Keras embedding (requirement)
-    emb_dim = word_to_vec_map[word_to_vec_map.keys()[0]].shape[0]  # define dimensionality of your word vectors
+    emb_dim = word_to_vec_map[list(word_to_vec_map.keys())[0]].shape[0]  # define dimensionality of your word vectors
     print("Found word2vec dimesnsions: ", emb_dim)
 
     # Initialize the embedding matrix as a numpy array of zeros of shape
@@ -84,8 +82,9 @@ def pretrained_embedding_layer(word_to_vec_map, word_to_index):
     return embedding_layer
 
 
-def create_rnn_encoding_model(input_shape, word_to_vec_map, word_to_index,
-                              hidden_layer_size=256, lr=0.001, loss_func='categorial_crossentropy',
+def create_rnn_encoding_model(Fx, Tx, word_to_vec_map, word_to_index, embedding_size,
+                              hidden_layer_size=256, optimizer=Adam(0.001), loss_func='categorial_crossentropy',
+                              e1=32,e2=16,
                               compile=True):
     """
     Function creating the Emojify-v2 model's graph.
@@ -99,33 +98,54 @@ def create_rnn_encoding_model(input_shape, word_to_vec_map, word_to_index,
     model -- a model instance in Keras
     """
     print("Creating new rnn encoding model...")
+    Ty = 1
+    Fy = embedding_size
     # Define sentence_indices as the input of the graph, it should be of shape input_shape
     #  and dtype 'int32' (as it contains indices).
-    sentence_indices = Input(shape=input_shape, dtype=np.int32)
-
-    # Create the embedding layer pretrained with GloVe Vectors (≈1 line)
-    embedding_layer = pretrained_embedding_layer(word_to_vec_map, word_to_index)
+    x1_orig = Input(shape=(Tx, 1), dtype=np.int32)
+    x2_orig = Input(shape=(Tx, 1), dtype=np.int32)
 
     # Propagate sentence_indices through your embedding layer, you get back the embeddings
-    embeddings = embedding_layer(sentence_indices)
+    embedding_layer = pretrained_embedding_layer(word_to_vec_map, word_to_index)
+    x1 = embedding_layer(x1_orig)
+    x2 = embedding_layer(x2_orig)
+    print("Embedding shape: ", x1.shape)
 
-    # Propagate the embeddings through an LSTM layer with 128-dimensional hidden state
-    # Be careful, the returned output should be a batch of sequences.
-    X = LSTM(hidden_layer_size, return_sequences=True)(embeddings)
-    # Add dropout with a probability of 0.5
-    X = Dropout(0.5)(X)
-    # Propagate X trough another LSTM layer with 128-dimensional hidden state
-    # Be careful, the returned output should be a single hidden state, not a batch of sequences.
-    X = LSTM(hidden_layer_size, return_sequences=False)(X)
-    # Add dropout with a probability of 0.5
-    X = Dropout(0.5)(X)
-    # Propagate X through a Dense layer with softmax activation to get back a batch of 5-dimensional vectors.
-    X = Dense(5, activation="softmax")(X)
+    s0 = Input(shape=(hidden_layer_size,), name='s0')
+    c0 = Input(shape=(hidden_layer_size,), name='c0')
+
+    attention_creator = AttentionModelCreator(Fx, Tx, Fy, Ty, hidden_layer_size,
+                                              hidden_layer_size, e1=e1, e2=e2,
+                                              activation="tanh")
+
+    att1 = attention_creator.create_from_inputs(loss_func, layers_only=True,
+                                                optimizer=optimizer,
+                                                x=x1, s0=s0, c0=c0)
+
+    att2 = attention_creator.create_from_inputs(loss_func, layers_only=True,
+                                                optimizer=optimizer,
+                                                x=x2, s0=s0, c0=c0)
+
+    if len(att1) != 1:
+        print("len(att1) = ", len(att1))
+        raise AttributeError
+    if len(att2) != 1:
+        print("len(att2) = ", len(att2))
+        raise AttributeError
+
+    att1 = att1[0]
+    att2 = att2[0]
+
+    att1 = Reshape((embedding_size,))(att1)
+    att2 = Reshape((embedding_size,))(att2)
+
+    dot = Dot(-1, False)([att1, att2])
+    x = Dense(1, activation='sigmoid')(dot)
 
     # Create Model instance which converts sentence_indices into X.
-    model = Model(inputs=sentence_indices, outputs=X)
+    model = Model(inputs=[x1_orig,x2_orig,s0,c0], outputs=x)
     if compile:
-        model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
+        model.compile(loss=loss_func, optimizer=optimizer, metrics=['accuracy'])
     return model
 
 
@@ -139,9 +159,11 @@ def load_rnn_encoding_model(model_file, lr=0.001,
 
 
 class RnnEncoder:
-    def __init__(self, filepath, load_previous_model=True, batch_size=512, word2vec_size=256,
+    def __init__(self, filepath, load_previous_model=True, word_to_index=None, word_to_vec_map=None, batch_size=512, word2vec_size=256,
+                 max_len=500,
+                 hidden_layer_size=128,
                  embedding_size=64,
-                 vocab_size=None, lr=0.001,
+                 e1=16, e2=8, lr=0.001,
                  loss_func='mean_squared_error',
                  callback=None):
         self.filepath = filepath
@@ -149,6 +171,7 @@ class RnnEncoder:
         self.batch_size = batch_size
         self.loss_func = loss_func
         self.word2vec_size = word2vec_size
+        self.hidden_layer_size = hidden_layer_size
         self.lr = lr
         self.callback = callback
         self.model = None
@@ -158,14 +181,31 @@ class RnnEncoder:
             except:
                 print('Could not fine previous model... Creating new one now.')
         if self.model is None:
-            self.model = create_rnn_encoding_model(embedding_size, word2vec_size, vocab_size, lr=lr, loss_func=loss_func)
+            self.model = create_rnn_encoding_model(
+                word2vec_size, max_len,
+                hidden_layer_size=hidden_layer_size,
+                optimizer=Adam(lr=lr),
+                e1=e1,
+                e2=e2,
+                embedding_size=embedding_size,
+                word_to_index=word_to_index,
+                word_to_vec_map=word_to_vec_map,
+                loss_func=loss_func
+            )
 
-    def train(self, inputs, outputs, val_data, epochs=1, shuffle=True, callbacks=None):
-        for cnt in range(epochs):
-            self.model.fit(inputs, outputs, verbose=1, batch_size=self.batch_size,
-                           validation_data=val_data, shuffle=shuffle, callbacks=callbacks)
-            if self.callback is not None:
-                self.callback()
+    def train(self, x1, x2, y, epochs=1, shuffle=True, callbacks=None):
+        m = y.shape[0]
+
+        # define inputs
+        s0 = np.zeros((m, self.hidden_layer_size))
+        c0 = np.zeros((m, self.hidden_layer_size))
+
+        #outputs = list(outputs.swapaxes(0, 1))
+
+        # train
+        self.model.fit([x1, x2, s0, c0], y, epochs=epochs, batch_size=self.batch_size, shuffle=shuffle, callbacks=callbacks)
+        if self.callback is not None:
+            self.callback()
 
     def save(self):
         # save

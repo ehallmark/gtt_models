@@ -6,7 +6,6 @@ from keras.initializers import RandomUniform
 import keras as k
 
 
-
 def load_word2vec_model(model_file, lr=0.001,
                         loss_func='mean_squared_error'):
     print("Using previous model...")
