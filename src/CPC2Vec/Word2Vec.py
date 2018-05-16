@@ -4,7 +4,6 @@ import numpy as np
 from keras.callbacks import LearningRateScheduler
 from src.models.Word2VecModel import Word2Vec
 
-
 model_file_32 = '/home/ehallmark/data/python/cpc_sim_model_keras_word2vec_32.h5'
 model_file_64 = '/home/ehallmark/data/python/cpc_sim_model_keras_word2vec_64.h5'
 model_file_128 = '/home/ehallmark/data/python/cpc_sim_model_keras_word2vec_128.h5'
@@ -45,39 +44,39 @@ def load_cpc_to_index_map():
     return cpc_to_index_map
 
 
-load_previous_model = False
-learning_rate = 0.005
-decay = 0.0001
-vocab_size = 259840
-batch_size = 512
-epochs = 1
+if __name__ == "__main__":
+    load_previous_model = False
+    learning_rate = 0.001
+    decay = 0.0001
+    vocab_size = 259840
+    batch_size = 512
+    epochs = 1
 
-embedding_size_to_file_map = {
-    32: model_file_32,
-    64: model_file_64,
-    128: model_file_128
-}
+    embedding_size_to_file_map = {
+        #32: model_file_32,
+        64: model_file_64#,
+        #128: model_file_128
+    }
 
-scheduler = LearningRateScheduler(lambda n: learning_rate/(max(1, n*5)))
+    scheduler = LearningRateScheduler(lambda n: learning_rate/(max(1, n*5)))
 
-(data, val_data) = load_cpc_data(randomize=True)
-dictionary, reverse_dictionary = build_dictionaries()
-((word_target, word_context), labels) = data
-((val_target, val_context), val_labels) = val_data
+    (data, val_data) = load_cpc_data(randomize=True)
+    dictionary, reverse_dictionary = build_dictionaries()
+    ((word_target, word_context), labels) = data
+    ((val_target, val_context), val_labels) = val_data
 
+    histories = []
+    for vector_dim, model_file in embedding_size_to_file_map.items():
+        word2vec = Word2Vec(model_file, load_previous_model=load_previous_model, vocab_size=vocab_size,
+                            batch_size=batch_size, loss_func='mean_squared_error',
+                            embedding_size=vector_dim, lr=learning_rate)
+        print("Starting to train model with embedding_size: ", vector_dim)
+        history = word2vec.train([word_target, word_context], labels, ([val_target, val_context], val_labels),
+                                 epochs=epochs, shuffle=True, callbacks=[scheduler])
+        print("History for model: ", history)
+        histories.append(history)
+        word2vec.save()
 
-histories = []
-for vector_dim, model_file in embedding_size_to_file_map.items():
-    word2vec = Word2Vec(model_file, load_previous_model=load_previous_model, vocab_size=vocab_size,
-                        batch_size=batch_size, loss_func='mean_squared_error',
-                        embedding_size=vector_dim, lr=learning_rate)
-    print("Starting to train model with embedding_size: ", vector_dim)
-    history = word2vec.train([word_target, word_context], labels, ([val_target, val_context], val_labels),
-                             epochs=epochs, shuffle=True, callbacks=[scheduler])
-    print("History for model: ", history)
-    histories.append(history)
-    word2vec.save()
-
-for i in range(len(histories)):
-    print("History "+str(i), histories[i])
+    for i in range(len(histories)):
+        print("History "+str(i), histories[i])
 

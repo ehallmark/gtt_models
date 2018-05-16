@@ -7,43 +7,7 @@ from src.attention.AttentionModel import AttentionModelCreator
 np.random.seed(1)
 
 
-def sentences_to_indices(X, word_to_index, max_len):
-    """
-    Converts an array of sentences (strings) into an array of indices corresponding to words in the sentences.
-    The output shape should be such that it can be given to `Embedding()` (described in Figure 4).
-
-    Arguments:
-    X -- array of sentences (strings), of shape (m, 1)
-    word_to_index -- a dictionary containing the each word mapped to its index
-    max_len -- maximum number of words in a sentence. You can assume every sentence in X is no longer than this.
-
-    Returns:
-    X_indices -- array of indices corresponding to words in the sentences from X, of shape (m, max_len)
-    """
-
-    m = X.shape[0]  # number of training examples
-
-    # Initialize X_indices as a numpy matrix of zeros and the correct shape (≈ 1 line)
-    X_indices = np.zeros((m, max_len))
-
-    for i in range(m):  # loop over training examples
-
-        # Convert the ith training sentence in lower case and split is into words. You should get a list of words.
-        sentence_words = X[i].lower().split()
-
-        # Initialize j to 0
-        j = 0
-
-        # Loop over the words of sentence_words
-        for w in sentence_words:
-            # Set the (i,j)th entry of X_indices to the index of the correct word.
-            X_indices[i, j] = word_to_index[w]
-            # Increment j to j + 1
-            j = j + 1
-    return X_indices
-
-
-def pretrained_embedding_layer(word_to_vec_map, word_to_index):
+def pretrained_embedding_layer(emb_matrix, word_to_index):
     """
     Creates a Keras Embedding() layer and loads in pre-trained GloVe 50-dimensional vectors.
 
@@ -56,19 +20,10 @@ def pretrained_embedding_layer(word_to_vec_map, word_to_index):
     """
 
     vocab_len = len(word_to_index) + 1  # adding 1 to fit Keras embedding (requirement)
-    emb_dim = word_to_vec_map[list(word_to_vec_map.keys())[0]].shape[0]  # define dimensionality of your word vectors
-    print("Found word2vec dimesnsions: ", emb_dim)
+    vocab_len = vocab_len + 1   # adding 1 for zero vector
+    emb_dim = emb_matrix.shape[1]  # define dimensionality of your word vectors
+    print("Found word2vec dimensions: ", emb_dim)
 
-    # Initialize the embedding matrix as a numpy array of zeros of shape
-    # (vocab_len, dimensions of word vectors = emb_dim)
-    emb_matrix = np.zeros((vocab_len, emb_dim))
-
-    # Set each row "index" of the embedding matrix to be the word vector representation of
-    # the "index"th word of the vocabulary
-    for word, index in word_to_index.items():
-        emb_matrix[index, :] = word_to_vec_map[word]
-
-    # Define Keras embedding layer with the correct output/input sizes, make it trainable.
     # Use Embedding(...). Make sure to set trainable=False.
     embedding_layer = Embedding(vocab_len, emb_dim, trainable=False)
 
@@ -82,7 +37,7 @@ def pretrained_embedding_layer(word_to_vec_map, word_to_index):
     return embedding_layer
 
 
-def create_rnn_encoding_model(Fx, Tx, word_to_vec_map, word_to_index, embedding_size,
+def create_rnn_encoding_model(Fx, Tx, word2vec_data, word_to_index, embedding_size,
                               hidden_layer_size=256, optimizer=Adam(0.001), loss_func='categorial_crossentropy',
                               e1=32,e2=16,
                               compile=True):
@@ -106,7 +61,7 @@ def create_rnn_encoding_model(Fx, Tx, word_to_vec_map, word_to_index, embedding_
     x2_orig = Input(shape=(Tx, 1), dtype=np.int32)
 
     # Propagate sentence_indices through your embedding layer, you get back the embeddings
-    embedding_layer = pretrained_embedding_layer(word_to_vec_map, word_to_index)
+    embedding_layer = pretrained_embedding_layer(word2vec_data, word_to_index)
     x1 = embedding_layer(x1_orig)
     x2 = embedding_layer(x2_orig)
     print("Embedding shape: ", x1.shape)
@@ -159,7 +114,7 @@ def load_rnn_encoding_model(model_file, lr=0.001,
 
 
 class RnnEncoder:
-    def __init__(self, filepath, load_previous_model=True, word_to_index=None, word_to_vec_map=None, batch_size=512, word2vec_size=256,
+    def __init__(self, filepath, load_previous_model=True, word_to_index=None, word2vec_data=None, batch_size=512, word2vec_size=256,
                  max_len=500,
                  hidden_layer_size=128,
                  embedding_size=64,
@@ -189,7 +144,7 @@ class RnnEncoder:
                 e2=e2,
                 embedding_size=embedding_size,
                 word_to_index=word_to_index,
-                word_to_vec_map=word_to_vec_map,
+                word2vec_data=word2vec_data,
                 loss_func=loss_func
             )
 
