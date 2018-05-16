@@ -193,7 +193,7 @@ class RnnEncoder:
                 loss_func=loss_func
             )
 
-    def train(self, x1, x2, y, epochs=1, shuffle=True, callbacks=None):
+    def train(self, x1, x2, y, validation_data, epochs=1, shuffle=True, callbacks=None):
         m = y.shape[0]
 
         # define inputs
@@ -203,7 +203,8 @@ class RnnEncoder:
         #outputs = list(outputs.swapaxes(0, 1))
 
         # train
-        self.model.fit([x1, x2, s0, c0], y, epochs=epochs, batch_size=self.batch_size, shuffle=shuffle, callbacks=callbacks)
+        self.model.fit([x1, x2, s0, c0], y, epochs=epochs, validation_data=validation_data,
+                       batch_size=self.batch_size, shuffle=shuffle, callbacks=callbacks)
         if self.callback is not None:
             self.callback()
 
