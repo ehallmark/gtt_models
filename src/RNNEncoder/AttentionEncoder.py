@@ -32,14 +32,18 @@ if __name__ == "__main__":
         128: model_file_128
     }
 
+    print('Loading word to index map...')
     word_to_index = {}
-    for row in pd.read_csv(vocab_index_file, sep=','):
+    rows = pd.read_csv(vocab_index_file, sep=',')
+    for row in rows:
         word_to_index[row[0]] = row[1]
 
+    print('Loading word2vec model...')
     word2vec_data = np.loadtxt(vocab_vector_file)
 
     scheduler = LearningRateScheduler(lambda n: learning_rate/(max(1, n*5)))
 
+    print('Getting data...')
     (data, data_val) = get_data()
 
     data, y = data
@@ -47,6 +51,7 @@ if __name__ == "__main__":
     data_val, y_val = data_val
 
     histories = []
+    print('Training model...')
     for vector_dim, model_file in embedding_size_to_file_map.items():
         encoder = RnnEncoder(model_file, load_previous_model=load_previous_model,
                              hidden_layer_size=128, word2vec_size=word2vec_size,
