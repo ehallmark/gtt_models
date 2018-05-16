@@ -153,6 +153,10 @@ class RnnEncoder:
         s0 = np.zeros((m, self.hidden_layer_size))
         c0 = np.zeros((m, self.hidden_layer_size))
 
+        s0_val = np.zeros(validation_data[1].shape[0], self.hidden_layer_size)
+        c0_val = np.zeros(validation_data[1].shape[0], self.hidden_layer_size)
+        validation_data = ([validation_data[0][0], validation_data[0][1], s0_val, c0_val], validation_data[1])
+
         #outputs = list(outputs.swapaxes(0, 1))
 
         # train
