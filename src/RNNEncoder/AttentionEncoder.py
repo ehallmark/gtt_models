@@ -12,9 +12,9 @@ model_file_64 = '/home/ehallmark/data/python/attention_rnn_model_keras64.h5'
 model_file_128 = '/home/ehallmark/data/python/attention_rnn_model_keras128.h5'
 vocab_size = 477909
 def get_data():
-    x1 = pd.read_csv('/home/ehallmark/Downloads/rnn_keras_x1', sep=',')
-    x2 = pd.read_csv('/home/ehallmark/Downloads/rnn_keras_x2', sep=',')
-    y = pd.read_csv('/home/ehallmark/Downloads/rnn_keras_y', sep=',')
+    x1 = pd.read_csv('/home/ehallmark/Downloads/rnn_keras_x1.csv', sep=',')
+    x2 = pd.read_csv('/home/ehallmark/Downloads/rnn_keras_x2.csv', sep=',')
+    y = pd.read_csv('/home/ehallmark/Downloads/rnn_keras_y.csv', sep=',')
 
     seed = 1
     num_test = 20000
