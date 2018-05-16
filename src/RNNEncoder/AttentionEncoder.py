@@ -4,12 +4,6 @@ import numpy as np
 from keras.callbacks import LearningRateScheduler
 from src.models.RnnEncodingModel import RnnEncoder
 
-data_csv_file = '/home/ehallmark/Downloads/attention_rnn_data.csv'
-def get_data():
-    data = pd.read_csv(data_csv_file, sep=',')
-
-    return ((None, None), None), (None, None)
-
 
 vocab_vector_file = '/home/ehallmark/Downloads/word2vec256_vectors.txt'
 vocab_index_file = '/home/ehallmark/Downloads/word2vec256_index.txt'
@@ -17,6 +11,18 @@ model_file_32 = '/home/ehallmark/data/python/attention_rnn_model_keras32.h5'
 model_file_64 = '/home/ehallmark/data/python/attention_rnn_model_keras64.h5'
 model_file_128 = '/home/ehallmark/data/python/attention_rnn_model_keras128.h5'
 vocab_size = 477909
+def get_data():
+    x1 = pd.read_csv('/home/ehallmark/Downloads/rnn_keras_x1', sep=',')
+    x2 = pd.read_csv('/home/ehallmark/Downloads/rnn_keras_x2', sep=',')
+    y = pd.read_csv('/home/ehallmark/Downloads/rnn_keras_y', sep=',')
+
+    seed = 1
+    num_test = 20000
+    x1_val = x1.sample(n=num_test, replace=False, random_state=seed)
+    x2_val = x2.sample(n=num_test, replace=False, random_state=seed)
+    y_val = y.sample(n=num_test, replace=False, random_state=seed)
+    return ((x1, x2), y), ([x1_val, x2_val], y_val)
+
 
 if __name__ == "__main__":
     load_previous_model = False
@@ -48,7 +54,6 @@ if __name__ == "__main__":
 
     data, y = data
     x1, x2 = data
-    data_val, y_val = data_val
 
     histories = []
     print('Training model...')
@@ -62,7 +67,7 @@ if __name__ == "__main__":
                              word_to_index=word_to_index)
         print("Model Summary: ", encoder.model.summary())
         print("Starting to train model with embedding_size: ", vector_dim)
-        history = encoder.train(x1, x2, y, (data_val, y_val),
+        history = encoder.train(x1, x2, y, data_val,
                                  epochs=epochs, shuffle=True, callbacks=[scheduler])
         print("History for model: ", history)
         histories.append(history)
