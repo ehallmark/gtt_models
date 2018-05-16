@@ -38,12 +38,6 @@ if __name__ == "__main__":
         128: model_file_128
     }
 
-    print('Loading word to index map...')
-    word_to_index = {}
-    rows = pd.read_csv(vocab_index_file, sep=',')
-    for row in rows:
-        word_to_index[row[0]] = row[1]
-
     print('Loading word2vec model...')
     word2vec_data = np.loadtxt(vocab_vector_file)
 
@@ -64,7 +58,7 @@ if __name__ == "__main__":
                              embedding_size=vector_dim, lr=learning_rate,
                              max_len=10,
                              word2vec_data=word2vec_data,
-                             word_to_index=word_to_index)
+                             )
         print("Model Summary: ", encoder.model.summary())
         print("Starting to train model with embedding_size: ", vector_dim)
         history = encoder.train(x1, x2, y, data_val,
