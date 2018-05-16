@@ -25,8 +25,7 @@ def pretrained_embedding_layer(emb_matrix, word_to_index):
     print("Found word2vec dimensions: ", emb_dim)
 
     # Use Embedding(...). Make sure to set trainable=False.
-    mask = Masking(mask_value=mask_idx)
-    embedding_layer = Embedding(vocab_len, emb_dim, trainable=False)(mask)
+    embedding_layer = Embedding(vocab_len, emb_dim, trainable=False)
 
     # Build the embedding layer, it is required before setting the weights of the embedding layer.
     # Do not modify the "None".

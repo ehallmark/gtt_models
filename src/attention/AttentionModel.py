@@ -1,5 +1,5 @@
 import numpy as np
-from keras.layers import RepeatVector,Concatenate,Dense,Dot,Activation,LSTM,Input,Bidirectional, Lambda, Reshape
+from keras.layers import RepeatVector,Concatenate,Dense,Dot,Activation,LSTM,Input,Bidirectional, Lambda, Reshape, Masking
 from keras.models import Model
 from keras import backend as K
 from keras.optimizers import Adam
@@ -7,7 +7,7 @@ from keras.optimizers import Adam
 
 class AttentionModelCreator:
 
-    def __init__(self, Fx, Tx, Fy, Ty, n_a, n_s, e1=8, e2=8, activation="tanh"):
+    def __init__(self, Fx, Tx, Fy, Ty, n_a, n_s, e1=8, mask_idx=-1, e2=8, activation="tanh"):
         # Defined shared layers as global variables
         self.repeator = RepeatVector(Tx)
         self.Tx = Tx
@@ -22,6 +22,10 @@ class AttentionModelCreator:
         # We are using a custom softmax(axis = 1) loaded in this notebook
         self.activator = Activation("softmax", name='attention_weights')
         self.dotor = Dot(axes=1)
+        if mask_idx >= 0:
+            self.mask = Masking(mask_value=0.)
+        else:
+            self.mask = None
         self.a_ = Bidirectional(LSTM(self.n_a, return_sequences=True), merge_mode='concat')
         self.post_activation_LSTM_cell = LSTM(self.n_s, return_state=True)
         self.output_act = 'softmax'
@@ -95,8 +99,11 @@ class AttentionModelCreator:
             x = Reshape((self.Tx, self.Fx,))(x)
             #x = K.permute_dimensions(x, (0,2))
             #Lambda(lambda o: K.permute_dimensions(o, (0, 2, 1)))(x)
-            a = self.a_(x)
-
+            if self.mask is None:
+                a = self.a_(x)
+            else:
+                a = self.mask(x)
+                a = self.a_(a)
             # Step 2: Iterate for Ty steps
             for t in range(self.Ty):
                 #  Step 2.A: Perform one step of the attention mechanism to get back
