@@ -21,6 +21,11 @@ def get_data():
     x1_val = x1.sample(n=num_test, replace=False, random_state=seed)
     x2_val = x2.sample(n=num_test, replace=False, random_state=seed)
     y_val = y.sample(n=num_test, replace=False, random_state=seed)
+
+    x1 = np.array(x1).reshape(x1.shape[0], 1, x1.shape[1])
+    x2 = np.array(x2).reshape(x2.shape[0], 1, x2.shape[1])
+    x1_val = np.array(x1_val).reshape(x1_val.shape[0], 1, x1_val.shape[1])
+    x2_val = np.array(x2_val).reshape(x2_val.shape[0], 1, x2_val.shape[1])
     return ((x1, x2), y), ([x1_val, x2_val], y_val)
 
 
