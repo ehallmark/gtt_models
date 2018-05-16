@@ -2,7 +2,7 @@ from keras.optimizers import Adam
 import keras as k
 import numpy as np
 from keras.models import Model
-from keras.layers import Dense, Input, Dropout, LSTM, Activation, Dot, Reshape, Embedding
+from keras.layers import Dense, Input, Dropout, LSTM, Activation, Dot, Reshape, Embedding, Masking
 from src.attention.AttentionModel import AttentionModelCreator
 np.random.seed(1)
 
@@ -18,14 +18,15 @@ def pretrained_embedding_layer(emb_matrix, word_to_index):
     Returns:
     embedding_layer -- pretrained layer Keras instance
     """
-
-    vocab_len = len(word_to_index) + 1  # adding 1 to fit Keras embedding (requirement)
+    mask_idx = len(word_to_index)
+    vocab_len = mask_idx + 1  # adding 1 to fit Keras embedding (requirement)
     vocab_len = vocab_len + 1   # adding 1 for zero vector
     emb_dim = emb_matrix.shape[1]  # define dimensionality of your word vectors
     print("Found word2vec dimensions: ", emb_dim)
 
     # Use Embedding(...). Make sure to set trainable=False.
-    embedding_layer = Embedding(vocab_len, emb_dim, trainable=False)
+    mask = Masking(mask_value=mask_idx)
+    embedding_layer = Embedding(vocab_len, emb_dim, trainable=False)(mask)
 
     # Build the embedding layer, it is required before setting the weights of the embedding layer.
     # Do not modify the "None".
