@@ -155,15 +155,12 @@ def get_data():
 
     num_test = 20000
     seed = 1
-    x1 = np.array(x1)
-    np.random.seed(seed)
-    np.random.shuffle(x1)
-    x2 = np.array(x2)
-    np.random.seed(seed)
-    np.random.shuffle(x2)
-    y = np.array(y)
-    np.random.seed(seed)
-    np.random.shuffle(y)
+    x1 = np.array(x1.sample(frac=1.0, replace=False, random_state=seed))
+    x2 = np.array(x2.sample(frac=1.0, replace=False, random_state=seed))
+    y = np.array(y.sample(frac=1.0, replace=False, random_state=seed))
+
+    x1 = x1.reshape((x1.shape[0], x1.shape[1], 1))
+    x2 = x2.reshape((x2.shape[0], x2.shape[1], 1))
 
     x1_val = x1[:num_test]
     x2_val = x2[:num_test]
