@@ -2,12 +2,12 @@ from keras.optimizers import Adam
 import keras as k
 import numpy as np
 from keras.models import Model
-from keras.layers import Dense, Input, Dropout, LSTM, Activation, Dot, Reshape, Embedding, Masking
+from keras.layers import Dense, Input, Flatten, Dropout, LSTM, Activation, Dot, Reshape, Embedding, Masking
 from src.attention.AttentionModel import AttentionModelCreator
 np.random.seed(1)
 
 
-def pretrained_embedding_layer(emb_matrix):
+def pretrained_embedding_layer(emb_matrix, input_length):
     """
     Creates a Keras Embedding() layer and loads in pre-trained GloVe 50-dimensional vectors.
 
@@ -24,7 +24,7 @@ def pretrained_embedding_layer(emb_matrix):
     print("Found word2vec dimensions: ", emb_dim)
 
     # Use Embedding(...). Make sure to set trainable=False.
-    embedding_layer = Embedding(vocab_len, emb_dim, trainable=False)
+    embedding_layer = Embedding(vocab_len, emb_dim, input_length=input_length, mask_zero=False, trainable=False)
 
     # Build the embedding layer, it is required before setting the weights of the embedding layer.
     # Do not modify the "None".
@@ -60,7 +60,7 @@ def create_rnn_encoding_model(Fx, Tx, word2vec_data, embedding_size,
     x2_orig = Input(shape=(Tx, 1), dtype=np.int32)
 
     # Propagate sentence_indices through your embedding layer, you get back the embeddings
-    embedding_layer = pretrained_embedding_layer(word2vec_data)
+    embedding_layer = pretrained_embedding_layer(word2vec_data, Tx)
     x1 = embedding_layer(x1_orig)
     x2 = embedding_layer(x2_orig)
     print("Embedding shape: ", x1.shape)
@@ -70,6 +70,7 @@ def create_rnn_encoding_model(Fx, Tx, word2vec_data, embedding_size,
 
     attention_creator = AttentionModelCreator(Fx, Tx, Fy, Ty, hidden_layer_size,
                                               hidden_layer_size, e1=e1, e2=e2,
+                                              mask_idx=-1,
                                               activation="tanh")
 
     att1 = attention_creator.create_from_inputs(loss_func, layers_only=True,
@@ -90,8 +91,8 @@ def create_rnn_encoding_model(Fx, Tx, word2vec_data, embedding_size,
     att1 = att1[0]
     att2 = att2[0]
 
-    att1 = Reshape((embedding_size,))(att1)
-    att2 = Reshape((embedding_size,))(att2)
+    att1 = Flatten()(att1)
+    att2 = Flatten()(att2)
 
     dot = Dot(-1, False)([att1, att2])
     x = Dense(1, activation='sigmoid')(dot)
@@ -114,7 +115,7 @@ def load_rnn_encoding_model(model_file, lr=0.001,
 
 class RnnEncoder:
     def __init__(self, filepath, load_previous_model=True, word2vec_data=None, batch_size=512, word2vec_size=256,
-                 max_len=256,
+                 max_len=128,
                  hidden_layer_size=128,
                  embedding_size=64,
                  e1=16, e2=8, lr=0.001,
@@ -153,8 +154,8 @@ class RnnEncoder:
         s0 = np.zeros((m, self.hidden_layer_size))
         c0 = np.zeros((m, self.hidden_layer_size))
 
-        s0_val = np.zeros(validation_data[1].shape[0], self.hidden_layer_size)
-        c0_val = np.zeros(validation_data[1].shape[0], self.hidden_layer_size)
+        s0_val = np.zeros((validation_data[1].shape[0], self.hidden_layer_size))
+        c0_val = np.zeros((validation_data[1].shape[0], self.hidden_layer_size))
         validation_data = ([validation_data[0][0], validation_data[0][1], s0_val, c0_val], validation_data[1])
 
         #outputs = list(outputs.swapaxes(0, 1))

@@ -18,28 +18,30 @@ def get_data():
 
     seed = 1
     num_test = 20000
-    x1_val = x1.sample(n=num_test, replace=False, random_state=seed)
-    x2_val = x2.sample(n=num_test, replace=False, random_state=seed)
-    y_val = y.sample(n=num_test, replace=False, random_state=seed)
+    #x1_val = x1.sample(n=num_test, replace=False, random_state=seed)
+    #x2_val = x2.sample(n=num_test, replace=False, random_state=seed)
+    #y_val = y.sample(n=num_test, replace=False, random_state=seed)
 
     x1 = np.array(x1).reshape(x1.shape[0], x1.shape[1], 1)
     x2 = np.array(x2).reshape(x2.shape[0], x2.shape[1], 1)
-    x1_val = np.array(x1_val).reshape(x1_val.shape[0], x1_val.shape[1], 1)
-    x2_val = np.array(x2_val).reshape(x2_val.shape[0], x2_val.shape[1], 1)
+    x1_val = x1[:1000]
+    x2_val = x2[:1000]
+    y = np.array(y)
+    y_val = y[:1000]
     return ((x1, x2), y), ([x1_val, x2_val], y_val)
 
 
 if __name__ == "__main__":
     load_previous_model = False
-    learning_rate = 0.005
+    learning_rate = 0.0001
     decay = 0.0001
-    batch_size = 512
+    batch_size = 64
     epochs = 1
     word2vec_size = 256
 
     embedding_size_to_file_map = {
-        32: model_file_32,
-        64: model_file_64,
+        #32: model_file_32,
+        #64: model_file_64,
         128: model_file_128
     }
 

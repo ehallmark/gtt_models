@@ -7,7 +7,7 @@ from keras.optimizers import Adam
 
 class AttentionModelCreator:
 
-    def __init__(self, Fx, Tx, Fy, Ty, n_a, n_s, e1=8, mask_idx=-1, e2=8, activation="tanh"):
+    def __init__(self, Fx, Tx, Fy, Ty, n_a, n_s, e1=16, mask_idx=-1, e2=8, activation="tanh"):
         # Defined shared layers as global variables
         self.repeator = RepeatVector(Tx)
         self.Tx = Tx
@@ -136,7 +136,7 @@ class AttentionModelCreator:
             return outputs
 
 
-def train(model, hidden_units_post_attention, inputs, outputs, epochs=1, batch_size=512):
+def train(model, hidden_units_post_attention, inputs, outputs, epochs=1, batch_size=64):
     m = inputs.shape[0]
 
     # define inputs
