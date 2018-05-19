@@ -37,7 +37,7 @@ def pretrained_embedding_layer(emb_matrix, input_length):
     return embedding_layer
 
 
-def create_rnn_encoding_model(Fx, Tx, word2vec_data, embedding_size,
+def create_rnn_encoding_model(Fx, Tx, word2vec_data, embedding_size, hidden_layer_size=128,
                               optimizer=Adam(0.001), loss_func='categorial_crossentropy',
                               compile=True):
     """
@@ -61,15 +61,18 @@ def create_rnn_encoding_model(Fx, Tx, word2vec_data, embedding_size,
     embedding_layer = pretrained_embedding_layer(word2vec_data, Tx)
     x1 = embedding_layer(x1_orig)
     x2 = embedding_layer(x2_orig)
-    print("Embedding shape: ", x1.shape)
-
-    lstm = LSTM(embedding_size, activation='tanh', return_sequences=False)
-
+    print("Embedding shape before: ", x1.shape)
     x1 = Reshape((Tx, Fx))(x1)
     x2 = Reshape((Tx, Fx))(x2)
+    print("Embedding shape after: ", x1.shape)
 
-    enc1 = lstm(x1)
-    enc2 = lstm(x2)
+    lstm1 = LSTM(hidden_layer_size, activation='relu', return_sequences=True)
+    lstm2 = LSTM(embedding_size, activation='tanh', return_sequences=False)
+
+    enc1 = lstm1(x1)
+    enc2 = lstm1(x2)
+    enc1 = lstm2(enc1)
+    enc2 = lstm2(enc2)
 
     dot = Dot(-1, False)([enc1, enc2])
     x = Dense(1, activation='sigmoid')(dot)
@@ -152,9 +155,15 @@ def get_data():
 
     num_test = 20000
     seed = 1
-    x1 = np.array(x1.sample(frac=1.0, replace=False, random_state=seed))
-    x2 = np.array(x2.sample(frac=1.0, replace=False, random_state=seed))
-    y = np.array(y.sample(frac=1.0, replace=False, random_state=seed))
+    x1 = np.array(x1)
+    np.random.seed(seed)
+    np.random.shuffle(x1)
+    x2 = np.array(x2)
+    np.random.seed(seed)
+    np.random.shuffle(x2)
+    y = np.array(y)
+    np.random.seed(seed)
+    np.random.shuffle(y)
 
     x1_val = x1[:num_test]
     x2_val = x2[:num_test]
@@ -168,7 +177,7 @@ def get_data():
 
 def sample_data(x1, x2, y, n):
     indices = np.random.choice(x1.shape[0], n)
-    return x1[indices], x2[indices], y[indices]
+    return np.take(x1, indices, 0), np.take(x2, indices, 0), np.take(y, indices)
 
 
 if __name__ == "__main__":
