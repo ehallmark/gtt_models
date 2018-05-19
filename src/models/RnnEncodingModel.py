@@ -2,8 +2,9 @@ from keras.optimizers import Adam
 import keras as k
 import numpy as np
 from keras.models import Model
-from keras.layers import Dense, Input, Flatten, Dropout, LSTM, Activation, Dot, Reshape, Embedding, Masking
+from keras.layers import Dense, Input, Dropout, LSTM, Activation, Dot, Reshape, Embedding, Masking
 from src.attention.AttentionModel import AttentionModelCreator
+import pandas as pd
 np.random.seed(1)
 
 
@@ -37,8 +38,7 @@ def pretrained_embedding_layer(emb_matrix, input_length):
 
 
 def create_rnn_encoding_model(Fx, Tx, word2vec_data, embedding_size,
-                              hidden_layer_size=256, optimizer=Adam(0.001), loss_func='categorial_crossentropy',
-                              e1=32,e2=16,
+                              optimizer=Adam(0.001), loss_func='categorial_crossentropy',
                               compile=True):
     """
     Function creating the Emojify-v2 model's graph.
@@ -52,8 +52,6 @@ def create_rnn_encoding_model(Fx, Tx, word2vec_data, embedding_size,
     model -- a model instance in Keras
     """
     print("Creating new rnn encoding model...")
-    Ty = 1
-    Fy = embedding_size
     # Define sentence_indices as the input of the graph, it should be of shape input_shape
     #  and dtype 'int32' (as it contains indices).
     x1_orig = Input(shape=(Tx, 1), dtype=np.int32)
@@ -65,40 +63,19 @@ def create_rnn_encoding_model(Fx, Tx, word2vec_data, embedding_size,
     x2 = embedding_layer(x2_orig)
     print("Embedding shape: ", x1.shape)
 
-    s0 = Input(shape=(hidden_layer_size,), name='s0')
-    c0 = Input(shape=(hidden_layer_size,), name='c0')
+    lstm = LSTM(embedding_size, activation='tanh', return_sequences=False)
 
-    attention_creator = AttentionModelCreator(Fx, Tx, Fy, Ty, hidden_layer_size,
-                                              hidden_layer_size, e1=e1, e2=e2,
-                                              mask_idx=-1,
-                                              activation="tanh")
+    x1 = Reshape((Tx, Fx))(x1)
+    x2 = Reshape((Tx, Fx))(x2)
 
-    att1 = attention_creator.create_from_inputs(loss_func, layers_only=True,
-                                                optimizer=optimizer,
-                                                x=x1, s0=s0, c0=c0)
+    enc1 = lstm(x1)
+    enc2 = lstm(x2)
 
-    att2 = attention_creator.create_from_inputs(loss_func, layers_only=True,
-                                                optimizer=optimizer,
-                                                x=x2, s0=s0, c0=c0)
-
-    if len(att1) != 1:
-        print("len(att1) = ", len(att1))
-        raise AttributeError
-    if len(att2) != 1:
-        print("len(att2) = ", len(att2))
-        raise AttributeError
-
-    att1 = att1[0]
-    att2 = att2[0]
-
-    att1 = Flatten()(att1)
-    att2 = Flatten()(att2)
-
-    dot = Dot(-1, False)([att1, att2])
+    dot = Dot(-1, False)([enc1, enc2])
     x = Dense(1, activation='sigmoid')(dot)
 
     # Create Model instance which converts sentence_indices into X.
-    model = Model(inputs=[x1_orig,x2_orig,s0,c0], outputs=x)
+    model = Model(inputs=[x1_orig,x2_orig], outputs=x)
     if compile:
         model.compile(loss=loss_func, optimizer=optimizer, metrics=['accuracy'])
     return model
@@ -116,9 +93,8 @@ def load_rnn_encoding_model(model_file, lr=0.001,
 class RnnEncoder:
     def __init__(self, filepath, load_previous_model=True, word2vec_data=None, batch_size=512, word2vec_size=256,
                  max_len=128,
-                 hidden_layer_size=128,
                  embedding_size=64,
-                 e1=16, e2=8, lr=0.001,
+                 lr=0.001,
                  loss_func='mean_squared_error',
                  callback=None):
         self.filepath = filepath
@@ -126,7 +102,6 @@ class RnnEncoder:
         self.batch_size = batch_size
         self.loss_func = loss_func
         self.word2vec_size = word2vec_size
-        self.hidden_layer_size = hidden_layer_size
         self.lr = lr
         self.callback = callback
         self.model = None
@@ -138,30 +113,18 @@ class RnnEncoder:
         if self.model is None:
             self.model = create_rnn_encoding_model(
                 word2vec_size, max_len,
-                hidden_layer_size=hidden_layer_size,
                 optimizer=Adam(lr=lr),
-                e1=e1,
-                e2=e2,
                 embedding_size=embedding_size,
                 word2vec_data=word2vec_data,
                 loss_func=loss_func
             )
 
     def train(self, x1, x2, y, validation_data, epochs=1, shuffle=True, callbacks=None):
-        m = y.shape[0]
 
-        # define inputs
-        s0 = np.zeros((m, self.hidden_layer_size))
-        c0 = np.zeros((m, self.hidden_layer_size))
-
-        s0_val = np.zeros((validation_data[1].shape[0], self.hidden_layer_size))
-        c0_val = np.zeros((validation_data[1].shape[0], self.hidden_layer_size))
-        validation_data = ([validation_data[0][0], validation_data[0][1], s0_val, c0_val], validation_data[1])
-
-        #outputs = list(outputs.swapaxes(0, 1))
+        validation_data = ([validation_data[0][0], validation_data[0][1]], validation_data[1])
 
         # train
-        self.model.fit([x1, x2, s0, c0], y, epochs=epochs, validation_data=validation_data,
+        self.model.fit([x1, x2], y, epochs=epochs, validation_data=validation_data,
                        batch_size=self.batch_size, shuffle=shuffle, callbacks=callbacks)
         if self.callback is not None:
             self.callback()
@@ -174,4 +137,78 @@ class RnnEncoder:
         self.model = load_rnn_encoding_model(self.filepath, lr=self.lr, loss_func=self.loss_func)
 
 
+vocab_vector_file = '/home/ehallmark/Downloads/word2vec256_vectors.txt'
+vocab_index_file = '/home/ehallmark/Downloads/word2vec256_index.txt'
+model_file_32 = '/home/ehallmark/data/python/attention_rnn_model_keras32.h5'
+model_file_64 = '/home/ehallmark/data/python/attention_rnn_model_keras64.h5'
+model_file_128 = '/home/ehallmark/data/python/attention_rnn_model_keras128.h5'
+vocab_size = 477909
+
+
+def get_data():
+    x1 = pd.read_csv('/home/ehallmark/Downloads/rnn_keras_x1.csv', sep=',')
+    x2 = pd.read_csv('/home/ehallmark/Downloads/rnn_keras_x2.csv', sep=',')
+    y = pd.read_csv('/home/ehallmark/Downloads/rnn_keras_y.csv', sep=',')
+
+    num_test = 20000
+    seed = 1
+    x1 = np.array(x1.sample(frac=1.0, replace=False, random_state=seed))
+    x2 = np.array(x2.sample(frac=1.0, replace=False, random_state=seed))
+    y = np.array(y.sample(frac=1.0, replace=False, random_state=seed))
+
+    x1_val = x1[:num_test]
+    x2_val = x2[:num_test]
+    y_val = y[:num_test]
+    x1 = x1[num_test:]
+    x2 = x2[num_test:]
+    y = y[num_test:]
+
+    return ((x1, x2), y), ([x1_val, x2_val], y_val)
+
+
+def sample_data(x1, x2, y, n):
+    indices = np.random.choice(x1.shape[0], n)
+    return x1[indices], x2[indices], y[indices]
+
+
+if __name__ == "__main__":
+    load_previous_model = False
+    learning_rate = 0.01
+    decay = 0.0001
+    batch_size = 256
+    epochs = 1
+    samples_per_epoch = 100000
+    word2vec_size = 256
+
+    embedding_size_to_file_map = {
+        #32: model_file_32,
+        64: model_file_64
+        #128: model_file_128
+    }
+
+    print('Loading word2vec model...')
+    word2vec_data = np.loadtxt(vocab_vector_file)
+
+    print('Getting data...')
+    (data, data_val) = get_data()
+
+    data, y = data
+    x1, x2 = data
+
+    print('Training model...')
+    for vector_dim, model_file in embedding_size_to_file_map.items():
+        encoder = RnnEncoder(model_file, load_previous_model=load_previous_model,
+                             word2vec_size=word2vec_size,
+                             batch_size=batch_size, loss_func='mean_squared_error',
+                             embedding_size=vector_dim, lr=learning_rate,
+                             max_len=x1.shape[1],
+                             word2vec_data=word2vec_data)
+        print("Model Summary: ", encoder.model.summary())
+        print("Starting to train model with embedding_size: ", vector_dim)
+        for i in range(epochs):
+            _x1, _x2, _y = sample_data(x1, x2, y, samples_per_epoch)
+            encoder.train(_x1, _x2, _y, data_val,
+                                     epochs=1, shuffle=False, callbacks=None)
+
+            encoder.save()
 
