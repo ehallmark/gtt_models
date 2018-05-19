@@ -66,15 +66,15 @@ def create_rnn_encoding_model(Fx, Tx, word2vec_data, embedding_size, hidden_laye
     x2 = Reshape((Tx, Fx))(x2)
     print("Embedding shape after: ", x1.shape)
 
-    lstm1 = LSTM(hidden_layer_size, activation='relu', return_sequences=True)
+    #lstm1 = LSTM(hidden_layer_size, activation='relu', return_sequences=True)
     lstm2 = LSTM(embedding_size, activation='tanh', return_sequences=False)
 
-    enc1 = lstm1(x1)
-    enc2 = lstm1(x2)
-    enc1 = lstm2(enc1)
-    enc2 = lstm2(enc2)
+    #x1 = lstm1(x1)
+    #x2 = lstm1(x2)
+    x1 = lstm2(x1)
+    x2 = lstm2(x2)
 
-    dot = Dot(-1, False)([enc1, enc2])
+    dot = Dot(-1, False)([x1, x2])
     x = Dense(1, activation='sigmoid')(dot)
 
     # Create Model instance which converts sentence_indices into X.
@@ -154,10 +154,9 @@ def get_data():
     y = pd.read_csv('/home/ehallmark/Downloads/rnn_keras_y.csv', sep=',')
 
     num_test = 20000
-    seed = 1
-    x1 = np.array(x1.sample(frac=1.0, replace=False, random_state=seed))
-    x2 = np.array(x2.sample(frac=1.0, replace=False, random_state=seed))
-    y = np.array(y.sample(frac=1.0, replace=False, random_state=seed))
+    x1 = np.array(x1)
+    x2 = np.array(x2)
+    y = np.array(y)
 
     x1 = x1.reshape((x1.shape[0], x1.shape[1], 1))
     x2 = x2.reshape((x2.shape[0], x2.shape[1], 1))
@@ -179,10 +178,10 @@ def sample_data(x1, x2, y, n):
 
 if __name__ == "__main__":
     load_previous_model = False
-    learning_rate = 0.01
+    learning_rate = 0.001
     decay = 0.0001
     batch_size = 256
-    epochs = 1
+    epochs = 100
     samples_per_epoch = 100000
     word2vec_size = 256
 
