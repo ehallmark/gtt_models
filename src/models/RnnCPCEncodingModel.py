@@ -74,13 +74,13 @@ def create_rnn_encoding_model(Fx, Tx, word2vec_data, embedding_size, hidden_laye
     dropout2 = Dropout(0.2)
 
     #x1 = lstm1(x1)
-    x1 = dropout(x1)
+    #x1 = dropout(x1)
     x1 = lstm2(x1)
-    x1 = dropout2(x1)
+    #x1 = dropout2(x1)
     #x2 = lstm1(x2)
-    x2 = dropout(x2)
+    #x2 = dropout(x2)
     x2 = lstm2(x2)
-    x2 = dropout2(x2)
+    #x2 = dropout2(x2)
 
     dot = Dot(-1, False)([x1, x2])
     x = Dense(1, activation='sigmoid')(dot)
@@ -153,16 +153,16 @@ class RnnEncoder:
 
 vocab_vector_file = '/home/ehallmark/Downloads/word2vec256_vectors.txt'
 vocab_index_file = '/home/ehallmark/Downloads/word2vec256_index.txt'
-model_file_32 = '/home/ehallmark/data/python/attention_rnn_model_keras32.h5'
-model_file_64 = '/home/ehallmark/data/python/attention_rnn_model_keras64.h5'
-model_file_128 = '/home/ehallmark/data/python/attention_rnn_model_keras128.h5'
+model_file_32 = '/home/ehallmark/data/python/rnncpc_model_keras32.h5'
+model_file_64 = '/home/ehallmark/data/python/rnncpc_model_keras64.h5'
+model_file_128 = '/home/ehallmark/data/python/rnncpc_model_keras128.h5'
 vocab_size = 477909
 
 
 def get_data():
-    x1 = pd.read_csv('/home/ehallmark/Downloads/rnn_keras_x1.csv', sep=',')
-    x2 = pd.read_csv('/home/ehallmark/Downloads/rnn_keras_x2.csv', sep=',')
-    y = pd.read_csv('/home/ehallmark/Downloads/rnn_keras_y.csv', sep=',')
+    x1 = pd.read_csv('/home/ehallmark/Downloads/rnncpc_keras_x1.csv', sep=',')
+    x2 = pd.read_csv('/home/ehallmark/Downloads/rnncpc_keras_x2.csv', sep=',')
+    y = pd.read_csv('/home/ehallmark/Downloads/rnncpc_keras_y.csv', sep=',')
 
     num_test = 25000
     x1 = np.array(x1)
@@ -190,18 +190,19 @@ def sample_data(x1, x2, y, n):
 if __name__ == "__main__":
     load_previous_model = False
     learning_rate = 0.00001
+    min_learning_rate = 0.0000001
     decay = 0
     batch_size = 128
-    epochs = 5
+    epochs = 8
     samples_per_epoch = 100000
     word2vec_size = 256
 
     embedding_size_to_file_map = {
         #32: model_file_32,
-        #64: model_file_64
-        128: model_file_128
+        64: model_file_64
+        #128: model_file_128
     }
-    scheduler = LearningRateScheduler(lambda n: learning_rate/(max(1, n*5)))
+    scheduler = LearningRateScheduler(lambda n: max(min_learning_rate, learning_rate/(max(1, n*5))))
 
     print('Loading word2vec model...')
     word2vec_data = np.loadtxt(vocab_vector_file)
