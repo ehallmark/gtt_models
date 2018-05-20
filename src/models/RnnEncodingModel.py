@@ -5,6 +5,8 @@ from keras.models import Model
 from keras.layers import Dense, Input, Dropout, LSTM, Activation, Dot, Reshape, Embedding, Masking
 from src.attention.AttentionModel import AttentionModelCreator
 import pandas as pd
+from keras.callbacks import LearningRateScheduler
+
 np.random.seed(1)
 
 
@@ -97,6 +99,7 @@ class RnnEncoder:
     def __init__(self, filepath, load_previous_model=True, word2vec_data=None, batch_size=512, word2vec_size=256,
                  max_len=128,
                  embedding_size=64,
+                 decay = None,
                  lr=0.001,
                  loss_func='mean_squared_error',
                  callback=None):
@@ -104,6 +107,7 @@ class RnnEncoder:
         self.embedding_size = embedding_size
         self.batch_size = batch_size
         self.loss_func = loss_func
+        self.decay = decay
         self.word2vec_size = word2vec_size
         self.lr = lr
         self.callback = callback
@@ -116,7 +120,7 @@ class RnnEncoder:
         if self.model is None:
             self.model = create_rnn_encoding_model(
                 word2vec_size, max_len,
-                optimizer=Adam(lr=lr),
+                optimizer=Adam(lr=lr, decay=decay),
                 embedding_size=embedding_size,
                 word2vec_data=word2vec_data,
                 loss_func=loss_func
@@ -131,6 +135,7 @@ class RnnEncoder:
                        batch_size=self.batch_size, shuffle=shuffle, callbacks=callbacks)
         if self.callback is not None:
             self.callback()
+
 
     def save(self):
         # save
@@ -153,7 +158,7 @@ def get_data():
     x2 = pd.read_csv('/home/ehallmark/Downloads/rnn_keras_x2.csv', sep=',')
     y = pd.read_csv('/home/ehallmark/Downloads/rnn_keras_y.csv', sep=',')
 
-    num_test = 20000
+    num_test = 25000
     x1 = np.array(x1)
     x2 = np.array(x2)
     y = np.array(y)
@@ -179,17 +184,19 @@ def sample_data(x1, x2, y, n):
 if __name__ == "__main__":
     load_previous_model = False
     learning_rate = 0.001
-    decay = 0.0001
-    batch_size = 256
-    epochs = 100
+    decay = 0
+    batch_size = 512
+    epochs = 5
     samples_per_epoch = 100000
     word2vec_size = 256
+    acc_threshold = 0.98
 
     embedding_size_to_file_map = {
         #32: model_file_32,
         64: model_file_64
         #128: model_file_128
     }
+    scheduler = LearningRateScheduler(lambda n: learning_rate/(max(1, n*5)))
 
     print('Loading word2vec model...')
     word2vec_data = np.loadtxt(vocab_vector_file)
@@ -205,7 +212,7 @@ if __name__ == "__main__":
         encoder = RnnEncoder(model_file, load_previous_model=load_previous_model,
                              word2vec_size=word2vec_size,
                              batch_size=batch_size, loss_func='mean_squared_error',
-                             embedding_size=vector_dim, lr=learning_rate,
+                             embedding_size=vector_dim, lr=learning_rate, decay=decay,
                              max_len=x1.shape[1],
                              word2vec_data=word2vec_data)
         print("Model Summary: ", encoder.model.summary())
@@ -213,7 +220,5 @@ if __name__ == "__main__":
         for i in range(epochs):
             _x1, _x2, _y = sample_data(x1, x2, y, samples_per_epoch)
             encoder.train(_x1, _x2, _y, data_val,
-                                     epochs=1, shuffle=False, callbacks=None)
-
+                                     epochs=1, shuffle=False, callbacks=[scheduler])
             encoder.save()
-
