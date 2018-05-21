@@ -189,18 +189,18 @@ def sample_data(x1, x2, y, n):
 
 if __name__ == "__main__":
     load_previous_model = False
-    learning_rate = 0.0001
+    learning_rate = 0.001
     min_learning_rate = 0.000001
     decay = 0
     batch_size = 128
-    epochs = 10
-    samples_per_epoch = 100000
+    epochs = 50
+    samples_per_epoch = 200000
     word2vec_size = 256
 
     embedding_size_to_file_map = {
         #32: model_file_32,
-        64: model_file_64
-        #128: model_file_128
+        #64: model_file_64
+        128: model_file_128
     }
     scheduler = LearningRateScheduler(lambda n: max(min_learning_rate, learning_rate/(max(1, n*5))))
 
