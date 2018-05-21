@@ -189,11 +189,11 @@ def sample_data(x1, x2, y, n):
 
 if __name__ == "__main__":
     load_previous_model = False
-    learning_rate = 0.00001
-    min_learning_rate = 0.0000001
+    learning_rate = 0.0001
+    min_learning_rate = 0.000001
     decay = 0
     batch_size = 128
-    epochs = 8
+    epochs = 10
     samples_per_epoch = 100000
     word2vec_size = 256
 
