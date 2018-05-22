@@ -39,7 +39,7 @@ def pretrained_embedding_layer(emb_matrix, input_length):
     return embedding_layer
 
 
-def create_rnn_encoding_model(Fcpc, Fx, Tx, cpc2vec_data, word2vec_data, embedding_size, hidden_layer_size=256,
+def create_rnn_encoding_model(Fcpc, Fx, Tx, cpc2vec_data, word2vec_data, embedding_size, hidden_layer_size=128,
                               optimizer=Adam(0.001), loss_func='categorial_crossentropy',
                               compile=True):
     """
@@ -92,6 +92,7 @@ def create_rnn_encoding_model(Fcpc, Fx, Tx, cpc2vec_data, word2vec_data, embeddi
 
     y1 = y(dot)
     y2 = y(dot2)
+
 
     # Create Model instance which converts sentence_indices into X.
     model = Model(inputs=[x1_orig, x2_orig, cpc_orig], outputs=[y1, y2])
@@ -159,7 +160,8 @@ class RnnEncoder:
         self.model = load_rnn_encoding_model(self.filepath, lr=self.lr, loss_func=self.loss_func)
 
 
-vocab_vector_file = '/home/ehallmark/Downloads/word2vec256_vectors.txt'
+vocab_vector_file_txt = '/home/ehallmark/Downloads/word2vec256_vectors.txt'
+vocab_vector_file_h5 = '/home/ehallmark/Downloads/word2vec256_vectors.h5'  # h5 extension faster?
 vocab_index_file = '/home/ehallmark/Downloads/word2vec256_index.txt'
 model_file_32 = '/home/ehallmark/data/python/w2v_cpc_rnn_model_keras32.h5'
 model_file_64 = '/home/ehallmark/data/python/w2v_cpc_rnn_model_keras64.h5'
@@ -179,11 +181,11 @@ def get_data():
     cpc = np.array(cpc)
     y = np.array(y)
 
-    cpc = cpc.reshape((cpc.shape[0], cpc.shape[1], 1))
+    cpc = cpc.reshape((cpc.shape[0], cpc.shape[1]))
     x1 = x1.reshape((x1.shape[0], x1.shape[1], 1))
     x2 = x2.reshape((x2.shape[0], x2.shape[1], 1))
 
-    cpc_val = x1[:num_test]
+    cpc_val = cpc[:num_test]
     x1_val = x1[:num_test]
     x2_val = x2[:num_test]
     y_val = y[:num_test]
@@ -192,7 +194,7 @@ def get_data():
     x2 = x2[num_test:]
     y = y[num_test:]
 
-    return ((x1, x2, cpc), y), ([x1_val, x2_val, cpc_val], y_val)
+    return ((x1, x2, cpc), y), ([x1_val, x2_val, cpc_val], [y_val, y_val.copy()])
 
 
 def sample_data(x1, x2, cpc, y, n):
@@ -202,12 +204,12 @@ def sample_data(x1, x2, cpc, y, n):
 
 if __name__ == "__main__":
     load_previous_model = False
-    learning_rate = 0.001
+    learning_rate = 0.0001
     min_learning_rate = 0.000001
     decay = 0
     batch_size = 128
-    epochs = 50
-    samples_per_epoch = 200000
+    epochs = 10
+    samples_per_epoch = 1000000
     word2vec_size = 256
 
     embedding_size_to_file_map = {
@@ -232,7 +234,11 @@ if __name__ == "__main__":
             print("Weights Shape: ", cpc2vec_weights.shape)
 
     print('Loading word2vec model...')
-    word2vec_data = np.loadtxt(vocab_vector_file)
+    try:
+        word2vec_data = np.load(vocab_vector_file_h5)
+    except FileNotFoundError:
+        print('defaulting to .txt extension')
+        word2vec_data = np.loadtxt(vocab_vector_file_txt)
 
     print('Getting data...')
     (data, data_val) = get_data()
@@ -254,6 +260,6 @@ if __name__ == "__main__":
         for i in range(epochs):
             _x1, _x2, _cpc, _y = sample_data(x1, x2, cpc, y, samples_per_epoch)
             model = encoder.model
-            model.fit([x1, x2, cpc], [y, y], epochs=epochs, validation_data=data_val,
+            model.fit([_x1, _x2, _cpc], [_y, _y.copy()], epochs=epochs, validation_data=data_val,
                       batch_size=batch_size, shuffle=False, callbacks=[scheduler])
             encoder.save()
