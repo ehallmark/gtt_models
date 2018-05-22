@@ -39,7 +39,7 @@ def pretrained_embedding_layer(emb_matrix, input_length):
     return embedding_layer
 
 
-def create_rnn_encoding_model(Fcpc, Fx, Tx, cpc2vec_data, word2vec_data, embedding_size, hidden_layer_size=128,
+def create_rnn_encoding_model(Fcpc, Fx, Tx, cpc2vec_data, word2vec_data, embedding_size, hidden_layer_size=256,
                               optimizer=Adam(0.001), loss_func='categorial_crossentropy',
                               compile=True):
     """
@@ -73,15 +73,17 @@ def create_rnn_encoding_model(Fcpc, Fx, Tx, cpc2vec_data, word2vec_data, embeddi
     print("Embedding shape after: ", x1.shape)
 
     lstm_w2v = LSTM(embedding_size, activation='tanh', return_sequences=False)
-    lstm_cpc = LSTM(embedding_size, activation='tanh', return_sequences=False)
+    dense_cpc = Dense(hidden_layer_size, activation='tanh')
     embedding_dense = Dense(embedding_size, activation='tanh')
-    #dropout = Dropout(0.2)
 
     x1 = lstm_w2v(x1)
+    #  x1 = Dropout(0.2)(x1)  # dropout layer if desired
     x1 = embedding_dense(x1)
     x2 = lstm_w2v(x2)
+    #  x2 = Dropout(0.2)(x2)
     x2 = embedding_dense(x2)
-    cpc = lstm_cpc(cpc)
+    cpc = dense_cpc(cpc)
+    #  cpc = Dropout(0.2)(cpc)
     cpc = embedding_dense(cpc)
 
     dot = Dot(-1, False)([x1, x2])
@@ -143,7 +145,7 @@ class RnnEncoder:
 
     def train(self, x1, x2, cpc, y, validation_data, epochs=1, shuffle=True, callbacks=None):
         # train
-        self.model.fit([x1, x2], [y, y], epochs=epochs, validation_data=validation_data,
+        self.model.fit([x1, x2, cpc], [y, y], epochs=epochs, validation_data=validation_data,
                        batch_size=self.batch_size, shuffle=shuffle, callbacks=callbacks)
         if self.callback is not None:
             self.callback()
@@ -166,10 +168,10 @@ vocab_size = 477909
 
 
 def get_data():
-    x1 = pd.read_csv('/home/ehallmark/Downloads/word2vec_cpc_keras_x1.csv', sep=',')
-    x2 = pd.read_csv('/home/ehallmark/Downloads/word2vec_cpc_x2.csv', sep=',')
-    cpc = pd.read_csv('/home/ehallmark/Downloads/word2vec_cpc_cpc.csv', sep=',')
-    y = pd.read_csv('/home/ehallmark/Downloads/word2vec_cpc_y.csv', sep=',')
+    x1 = pd.read_csv('/home/ehallmark/Downloads/word_cpc_rnn_keras_x1.csv', sep=',')
+    x2 = pd.read_csv('/home/ehallmark/Downloads/word_cpc_rnn_keras_x2.csv', sep=',')
+    cpc = pd.read_csv('/home/ehallmark/Downloads/word_cpc_rnn_keras_cpc.csv', sep=',')
+    y = pd.read_csv('/home/ehallmark/Downloads/word_cpc_rnn_keras_y.csv', sep=',')
 
     num_test = 25000
     x1 = np.array(x1)
@@ -215,6 +217,20 @@ if __name__ == "__main__":
     }
     scheduler = LearningRateScheduler(lambda n: max(min_learning_rate, learning_rate/(max(1, n*5))))
 
+    cpc2vec_dim = 64
+    print('Loading cpc2vec...')
+    w2v_model_file_64 = '/home/ehallmark/data/python/cpc_sim_model_keras_word2vec_' + str(cpc2vec_dim) + '.h5'
+    cpc2vec = Word2Vec(w2v_model_file_64, load_previous_model=True,
+                       loss_func='mean_squared_error', lr=learning_rate)
+
+    print("Num layers: ", len(cpc2vec.model.layers))
+    cpc2vec_weights = None
+    for layer in cpc2vec.model.layers:
+        if isinstance(layer, Embedding):
+            print("Found Embedding Layer: ", layer)
+            cpc2vec_weights = layer.get_weights()[0]
+            print("Weights Shape: ", cpc2vec_weights.shape)
+
     print('Loading word2vec model...')
     word2vec_data = np.loadtxt(vocab_vector_file)
 
@@ -223,13 +239,6 @@ if __name__ == "__main__":
 
     data, y = data
     x1, x2, cpc = data
-
-    cpc2vec_dim = 64
-    w2v_model_file_64 = '/home/ehallmark/data/python/cpc_sim_model_keras_word2vec_'+str(cpc2vec_dim)+'.h5'
-    cpc2vec = Word2Vec(w2v_model_file_64, load_previous_model=True,
-                        loss_func='mean_squared_error', lr=learning_rate)
-
-    cpc2vec_weights = cpc2vec.model.get_layer(name='embedding_1').get_weights()
 
     print('Training model...')
     for vector_dim, model_file in embedding_size_to_file_map.items():
