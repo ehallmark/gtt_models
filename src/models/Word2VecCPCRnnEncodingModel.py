@@ -72,7 +72,7 @@ def create_rnn_encoding_model(Fcpc, Fx, Tx, cpc2vec_data, word2vec_data, embeddi
     cpc = Flatten()(cpc)
     print("Embedding shape after: ", x1.shape)
 
-    lstm_w2v = LSTM(embedding_size, activation='tanh', return_sequences=False)
+    lstm_w2v = LSTM(hidden_layer_size, activation='tanh', return_sequences=False)
     dense_cpc = Dense(hidden_layer_size, activation='tanh')
     embedding_dense = Dense(embedding_size, activation='tanh')
 
@@ -196,7 +196,7 @@ def get_data():
 
 
 def sample_data(x1, x2, cpc, y, n):
-    indices = np.random.choice(x1.shape[0], n)
+    indices = np.random.choice(cpc.shape[0]-1, n)
     return np.take(x1, indices, 0), np.take(x2, indices, 0), np.take(cpc, indices), np.take(y, indices)
 
 
@@ -253,6 +253,7 @@ if __name__ == "__main__":
         print("Starting to train model with embedding_size: ", vector_dim)
         for i in range(epochs):
             _x1, _x2, _cpc, _y = sample_data(x1, x2, cpc, y, samples_per_epoch)
-            encoder.train(_x1, _x2, _cpc, _y, data_val,
-                                     epochs=1, shuffle=False, callbacks=[scheduler])
+            model = encoder.model
+            model.fit([x1, x2, cpc], [y, y], epochs=epochs, validation_data=data_val,
+                      batch_size=batch_size, shuffle=False, callbacks=[scheduler])
             encoder.save()
