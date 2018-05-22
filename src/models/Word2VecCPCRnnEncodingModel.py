@@ -196,7 +196,7 @@ def get_data():
 
 
 def sample_data(x1, x2, cpc, y, n):
-    indices = np.random.choice(cpc.shape[0]-1, n)
+    indices = np.random.choice(cpc.shape[0], n)
     return np.take(x1, indices, 0), np.take(x2, indices, 0), np.take(cpc, indices), np.take(y, indices)
 
 
