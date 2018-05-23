@@ -116,7 +116,7 @@ class RnnEncoder:
                  max_len=128,
                  embedding_size=64,
                  hidden_layer_size=128,
-                 decay = 0,
+                 decay=0,
                  lr=0.001,
                  loss_func='mean_squared_error',
                  callback=None):

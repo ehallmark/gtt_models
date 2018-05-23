@@ -83,17 +83,12 @@ class Word2Vec:
         self.model = load_word2vec_model(self.filepath, lr=self.lr, loss_func=self.loss_func)
 
 
-
-
 model_file_32 = '/home/ehallmark/data/python/cpc_sim_model_keras_word2vec_32.h5'
 model_file_64 = '/home/ehallmark/data/python/cpc_sim_model_keras_word2vec_64.h5'
 model_file_128 = '/home/ehallmark/data/python/cpc_sim_model_keras_word2vec_128.h5'
 def build_dictionaries():
     """Process raw inputs into a dataset."""
     dictionary = load_cpc_to_index_map()
-    count = []
-    for word, _ in count:
-        dictionary[word] = len(dictionary)
     reversed_dictionary = dict(zip(dictionary.values(), dictionary.keys()))
     return dictionary, reversed_dictionary
 
