@@ -220,8 +220,8 @@ if __name__ == "__main__":
 
     embedding_size_to_file_map = {
         #32: model_file_32,
-        64: model_file_64
-        #128: model_file_128
+        #64: model_file_64
+        128: model_file_128
     }
     scheduler = LearningRateScheduler(lambda n: max(min_learning_rate, learning_rate/(max(1, n*5))))
 
