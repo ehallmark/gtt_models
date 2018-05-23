@@ -7,7 +7,7 @@ import pandas as pd
 from keras.callbacks import LearningRateScheduler
 from src.models.Word2VecModel import Word2Vec
 
-np.random.seed(1)
+np.random.seed(2)
 
 
 def pretrained_embedding_layer(emb_matrix, input_length):
@@ -102,11 +102,12 @@ def create_rnn_encoding_model(Fcpc, Fx, Tx, cpc2vec_data, word2vec_data, embeddi
 
 
 def load_rnn_encoding_model(model_file, lr=0.001,
+                            decay=0,
                             loss_func='categorical_crossentropy', compile=True):
     print("Using previous model...")
     model = k.models.load_model(model_file, compile=False)
     if compile:
-        model.compile(loss=loss_func, optimizer=Adam(lr=lr), metrics=['accuracy'])
+        model.compile(loss=loss_func, optimizer=Adam(lr=lr, decay=decay), metrics=['accuracy'])
     return model
 
 
@@ -114,7 +115,8 @@ class RnnEncoder:
     def __init__(self, filepath, load_previous_model=True, cpc2vec_size=64, word2vec_data=None, cpc2vec_data=None, batch_size=512, word2vec_size=256,
                  max_len=128,
                  embedding_size=64,
-                 decay = None,
+                 hidden_layer_size=128,
+                 decay = 0,
                  lr=0.001,
                  loss_func='mean_squared_error',
                  callback=None):
@@ -127,6 +129,7 @@ class RnnEncoder:
         self.word2vec_size = word2vec_size
         self.lr = lr
         self.callback = callback
+        self.hidden_layer_size = hidden_layer_size
         self.model = None
         if load_previous_model:
             try:
@@ -140,6 +143,7 @@ class RnnEncoder:
                 optimizer=Adam(lr=lr, decay=decay),
                 embedding_size=embedding_size,
                 word2vec_data=word2vec_data,
+                hidden_layer_size=hidden_layer_size,
                 cpc2vec_data=cpc2vec_data,
                 loss_func=loss_func
             )
@@ -157,11 +161,11 @@ class RnnEncoder:
         self.model.save(self.filepath)
 
     def load(self):
-        self.model = load_rnn_encoding_model(self.filepath, lr=self.lr, loss_func=self.loss_func)
+        self.model = load_rnn_encoding_model(self.filepath, lr=self.lr, decay=decay, loss_func=self.loss_func)
 
 
 vocab_vector_file_txt = '/home/ehallmark/Downloads/word2vec256_vectors.txt'
-vocab_vector_file_h5 = '/home/ehallmark/Downloads/word2vec256_vectors.h5'  # h5 extension faster?
+vocab_vector_file_h5 = '/home/ehallmark/Downloads/word2vec256_vectors.h5.npy'  # h5 extension faster? YES by alot
 vocab_index_file = '/home/ehallmark/Downloads/word2vec256_index.txt'
 model_file_32 = '/home/ehallmark/data/python/w2v_cpc_rnn_model_keras32.h5'
 model_file_64 = '/home/ehallmark/data/python/w2v_cpc_rnn_model_keras64.h5'
@@ -204,18 +208,20 @@ def sample_data(x1, x2, cpc, y, n):
 
 if __name__ == "__main__":
     load_previous_model = False
-    learning_rate = 0.0001
+    learning_rate = 0.001
+    initial_epoch = 0
     min_learning_rate = 0.000001
     decay = 0
-    batch_size = 128
-    epochs = 10
+    batch_size = 512
+    epochs = 50
     samples_per_epoch = 1000000
     word2vec_size = 256
+    hidden_layer_size = 256
 
     embedding_size_to_file_map = {
         #32: model_file_32,
-        #64: model_file_64
-        128: model_file_128
+        64: model_file_64
+        #128: model_file_128
     }
     scheduler = LearningRateScheduler(lambda n: max(min_learning_rate, learning_rate/(max(1, n*5))))
 
@@ -228,17 +234,19 @@ if __name__ == "__main__":
     print("Num layers: ", len(cpc2vec.model.layers))
     cpc2vec_weights = None
     for layer in cpc2vec.model.layers:
-        if isinstance(layer, Embedding):
+        if (not load_previous_model) and isinstance(layer, Embedding):
             print("Found Embedding Layer: ", layer)
             cpc2vec_weights = layer.get_weights()[0]
             print("Weights Shape: ", cpc2vec_weights.shape)
 
     print('Loading word2vec model...')
-    try:
-        word2vec_data = np.load(vocab_vector_file_h5)
-    except FileNotFoundError:
-        print('defaulting to .txt extension')
-        word2vec_data = np.loadtxt(vocab_vector_file_txt)
+    word2vec_data = None
+    if not load_previous_model:
+        try:
+            word2vec_data = np.load(vocab_vector_file_h5)
+        except FileNotFoundError:
+            print('defaulting to .txt extension')
+            word2vec_data = np.loadtxt(vocab_vector_file_txt)
 
     print('Getting data...')
     (data, data_val) = get_data()
@@ -254,12 +262,15 @@ if __name__ == "__main__":
                              embedding_size=vector_dim, lr=learning_rate, decay=decay,
                              max_len=x1.shape[1],
                              cpc2vec_data=cpc2vec_weights,
+                             hidden_layer_size=hidden_layer_size,
                              word2vec_data=word2vec_data)
         print("Model Summary: ", encoder.model.summary())
         print("Starting to train model with embedding_size: ", vector_dim)
         for i in range(epochs):
             _x1, _x2, _cpc, _y = sample_data(x1, x2, cpc, y, samples_per_epoch)
             model = encoder.model
-            model.fit([_x1, _x2, _cpc], [_y, _y.copy()], epochs=epochs, validation_data=data_val,
-                      batch_size=batch_size, shuffle=False, callbacks=[scheduler])
+            hist = model.fit([_x1, _x2, _cpc], [_y, _y.copy()], epochs=1+initial_epoch+i, initial_epoch=initial_epoch+i, validation_data=data_val,
+                      verbose=1, batch_size=batch_size, shuffle=False, callbacks=[scheduler])
+            print("Finished epoch: ", i)
+            print('History: ', hist)
             encoder.save()
