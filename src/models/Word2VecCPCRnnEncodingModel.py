@@ -72,15 +72,18 @@ def create_rnn_encoding_model(Fcpc, Fx, Tx, cpc2vec_data, word2vec_data, embeddi
     cpc = Flatten()(cpc)
     print("Embedding shape after: ", x1.shape)
 
-    lstm_w2v = LSTM(hidden_layer_size, activation='tanh', return_sequences=False)
+    lstm_w2v = LSTM(hidden_layer_size*2, activation='tanh', return_sequences=False)
+    embedding_dense0 = Dense(embedding_size*2, activation='tanh')
     dense_cpc = Dense(hidden_layer_size, activation='tanh')
     embedding_dense = Dense(embedding_size, activation='tanh')
 
     x1 = lstm_w2v(x1)
     #  x1 = Dropout(0.2)(x1)  # dropout layer if desired
+    x1 = embedding_dense0(x1)
     x1 = embedding_dense(x1)
     x2 = lstm_w2v(x2)
     #  x2 = Dropout(0.2)(x2)
+    x2 = embedding_dense0(x2)
     x2 = embedding_dense(x2)
     cpc = dense_cpc(cpc)
     #  cpc = Dropout(0.2)(cpc)
@@ -167,9 +170,9 @@ class RnnEncoder:
 vocab_vector_file_txt = '/home/ehallmark/Downloads/word2vec256_vectors.txt'
 vocab_vector_file_h5 = '/home/ehallmark/Downloads/word2vec256_vectors.h5.npy'  # h5 extension faster? YES by alot
 vocab_index_file = '/home/ehallmark/Downloads/word2vec256_index.txt'
-model_file_32 = '/home/ehallmark/data/python/w2v_cpc_rnn_model_keras32.h5'
-model_file_64 = '/home/ehallmark/data/python/w2v_cpc_rnn_model_keras64.h5'
-model_file_128 = '/home/ehallmark/data/python/w2v_cpc_rnn_model_keras128.h5'
+# model_file_32 = '/home/ehallmark/data/python/w2v_cpc_rnn_model_keras32.h5'
+model_file_64 = '/home/ehallmark/data/python/w2v_cpc128_rnn_model_keras64.h5'
+model_file_128 = '/home/ehallmark/data/python/w2v_cpc128_rnn_model_keras128.h5'
 vocab_size = 477909
 
 
@@ -219,13 +222,13 @@ if __name__ == "__main__":
     hidden_layer_size = 256
 
     embedding_size_to_file_map = {
-        #32: model_file_32,
-        #64: model_file_64
+        # 32: model_file_32,
+        # 64: model_file_64
         128: model_file_128
     }
     scheduler = LearningRateScheduler(lambda n: max(min_learning_rate, learning_rate/(max(1, n*5))))
 
-    cpc2vec_dim = 64
+    cpc2vec_dim = 128  # 64
     print('Loading cpc2vec...')
     w2v_model_file_64 = '/home/ehallmark/data/python/cpc_sim_model_keras_word2vec_' + str(cpc2vec_dim) + '.h5'
     cpc2vec = Word2Vec(w2v_model_file_64, load_previous_model=True,
