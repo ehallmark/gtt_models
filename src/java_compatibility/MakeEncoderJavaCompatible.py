@@ -57,10 +57,10 @@ def encode_text(model, word_to_idx, texts):
     y = model.predict(x)
     for i in range(y.shape[0]):
         if i in invalid:
-            all_vectors.append(None)
+            all_vectors.append([0] * 128)
         else:
             all_vectors.append(y[i, :].flatten())
-    return all_vectors
+    return np.vstack(all_vectors)
 
 
 def encode_cpcs(model, cpc_to_idx, cpc_trees):
@@ -85,12 +85,15 @@ def encode_cpcs(model, cpc_to_idx, cpc_trees):
     for i in range(len(intervals)):
         interval = intervals[i]
         if i in invalid:
-            vecs.append(None)
+            vecs.append([0] * 128)
         else:
             vecs.append(y[idx:idx+interval, :].sum(0))
         idx += interval
-    return vecs
+    return np.vstack(vecs)
 
+
+def norm_across_rows(matrix):
+    return np.sum(matrix ** 2, axis=-1) ** (1./2)
 
 model_file_32 = '/home/ehallmark/data/python/w2v_cpc_rnn_model_keras32.h5'
 model_file_64 = '/home/ehallmark/data/python/w2v_cpc_rnn_model_keras64.h5'
@@ -99,16 +102,18 @@ model_file_128 = '/home/ehallmark/data/python/w2v_cpc128_rnn_model_keras128.h5'
 if __name__ == '__main__':
     print("Starting to setup sql...")
     conn = psycopg2.connect("dbname='patentdb' user='postgres' host='localhost' password='password'")
+    conn.autocommit = False
     conn2 = psycopg2.connect("dbname='patentdb' user='postgres' host='localhost' password='password'")
+    conn2.autocommit = True
     seed_cursor = conn.cursor("stream")
-    seed_cursor.itersize = 100
+    seed_cursor.itersize = 500
     seed_cursor.execute("""select p.family_id, p.abstract, tree from big_query_patent_english_abstract as p
        left outer join big_query_cpc_tree as c on (p.publication_number_full=c.publication_number_full)
        where p.family_id != '-1' """)
 
     ingest_cursor = conn2.cursor()
-    ingest_sql = """insert into big_query_embedding_by_fam (family_id,enc) values (%s,%s)
-        on conflict (family_id) do update set enc=excluded.enc"""
+    ingest_sql_pre = """insert into big_query_embedding_by_fam (family_id,enc) values """
+    ingest_sql_post = """ on conflict (family_id) do update set enc=excluded.enc"""
 
     print("Querying...")
 
@@ -147,7 +152,7 @@ if __name__ == '__main__':
     text_batch = []
     cpc_batch = []
     id_batch = []
-    batch_size = 512
+    batch_size = 500
     for record in seed_cursor:
         id = record[0]
         text = record[1]
@@ -159,27 +164,30 @@ if __name__ == '__main__':
         if len(text_batch) >= batch_size:
             all_cpc_encoding = encode_cpcs(cpc_model, cpc_idx_map, cpc_batch)
             all_text_encoding = encode_text(text_model, word_idx_map, text_batch)
+            cpc_norm = norm_across_rows(all_cpc_encoding)
+            all_cpc_encoding = all_cpc_encoding / np.where(cpc_norm != 0, cpc_norm, 1)[:, np.newaxis]
+            text_norm = norm_across_rows(all_text_encoding)
+            all_text_encoding = all_text_encoding / np.where(text_norm != 0, text_norm, 1)[:, np.newaxis]
+
+            all_vecs = all_text_encoding + all_cpc_encoding
+            all_norms = norm_across_rows(all_vecs)
+            all_vecs = all_vecs / all_norms[:, np.newaxis]
+            all_vecs = all_vecs.tolist()
+            all_norms = all_norms.tolist()
+            data = []
             for i in range(len(all_cpc_encoding)):
-                text_encoding = all_text_encoding[i]
-                cpc_encoding = all_cpc_encoding[i]
-                if text_encoding is None and cpc_encoding is None:
+                if all_norms[i] == 0:
                     not_found = not_found + 1
                 else:
-                    vec = None
-                    if text_encoding is not None and cpc_encoding is not None:
-                        vec = text_encoding / np.linalg.norm(text_encoding) + cpc_encoding / np.linalg.norm(cpc_encoding)
-                    elif text_encoding is not None:
-                        vec = text_encoding
-                    else:
-                        vec = cpc_encoding
-                    vec = vec / np.linalg.norm(vec)
-
-                    ingest_cursor.execute(ingest_sql, (id, vec.tolist()))
+                    vec = all_vecs[i]
+                    data.append((id_batch[i], vec))
                 if cnt % 1000 == 999:
                     print("Completed: ", cnt, ' Not found: ', not_found)
-                    conn2.commit()
 
                 cnt = cnt + 1
+
+            dataText = ','.join(ingest_cursor.mogrify('(%s,%s)', row).decode("utf-8") for row in data)
+            ingest_cursor.execute(ingest_sql_pre + dataText + ingest_sql_post)
             text_batch.clear()
             cpc_batch.clear()
             id_batch.clear()
