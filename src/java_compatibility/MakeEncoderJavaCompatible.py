@@ -57,12 +57,13 @@ model_file_128 = '/home/ehallmark/data/python/w2v_cpc128_rnn_model_keras128.h5'
 if __name__ == '__main__':
     print("Starting to setup sql...")
     conn = psycopg2.connect("dbname='patentdb' user='postgres' host='localhost' password='password'")
+    conn2 = psycopg2.connect("dbname='patentdb' user='postgres' host='localhost' password='password'")
     seed_cursor = conn.cursor("stream")
     seed_cursor.itersize = 100
     seed_cursor.execute("""select p.family_id, p.abstract, tree from big_query_patent_english_abstract as p
        join big_query_cpc_tree as c on (p.publication_number_full=c.publication_number_full)""")
 
-    ingest_cursor = conn.cursor()
+    ingest_cursor = conn2.cursor()
     ingest_sql = """insert into big_query_embedding_by_fam (family_id,enc) values (%s,%s) 
       on conflict (family_id) do update set enc=excluded.enc"""
     print("Querying...")
@@ -124,8 +125,9 @@ if __name__ == '__main__':
             ingest_cursor.execute(ingest_sql, (id, vec.tolist()))
         if cnt % 1000 == 999:
             print("Completed: ", cnt, ' Not found: ', not_found)
-            conn.commit()
+            conn2.commit()
         cnt = cnt + 1
 
     conn.close()
+    conn2.close()
 
