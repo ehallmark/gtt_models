@@ -164,7 +164,7 @@ class RnnEncoder:
         self.model.save(self.filepath)
 
     def load(self):
-        self.model = load_rnn_encoding_model(self.filepath, lr=self.lr, decay=decay, loss_func=self.loss_func)
+        self.model = load_rnn_encoding_model(self.filepath, lr=self.lr, decay=self.decay, loss_func=self.loss_func)
 
 
 vocab_vector_file_txt = '/home/ehallmark/Downloads/word2vec256_vectors.txt'
@@ -230,8 +230,8 @@ if __name__ == "__main__":
 
     cpc2vec_dim = 128  # 64
     print('Loading cpc2vec...')
-    w2v_model_file_64 = '/home/ehallmark/data/python/cpc_sim_model_keras_word2vec_' + str(cpc2vec_dim) + '.h5'
-    cpc2vec = Word2Vec(w2v_model_file_64, load_previous_model=True,
+    w2v_model_file = '/home/ehallmark/data/python/cpc_sim_model_keras_word2vec_' + str(cpc2vec_dim) + '.h5'
+    cpc2vec = Word2Vec(w2v_model_file, load_previous_model=True,
                        loss_func='mean_squared_error', lr=learning_rate)
 
     print("Num layers: ", len(cpc2vec.model.layers))
