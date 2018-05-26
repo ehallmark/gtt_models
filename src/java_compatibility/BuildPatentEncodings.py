@@ -14,12 +14,14 @@ def load_model(model_file):
 
 def load_word2vec_index_maps():
     word2vec_index_file = '/home/ehallmark/Downloads/word2vec256_index.txt'
-    word2vec_index = np.loadtxt(word2vec_index_file, delimiter=',', dtype=(str,int))
+    word2vec_index = np.array(pd.read_csv(word2vec_index_file, delimiter=',', header=None))
+    print(word2vec_index[0:10])
     word_to_index_map = {}
     index_to_word_map = {}
     for row in word2vec_index:
         idx = int(row[1])
         word = str(row[0])
+        print('word: ', word, ' idx: ',idx)
         if idx == 0:
             print("Found 0 index in word2vec... 0 index should be the mask index (i.e. not a word)."
                   + " Try rerunning IngestWord2VecToText java program.")
@@ -92,8 +94,66 @@ def encode_cpcs(model, cpc_to_idx, cpc_trees):
     return np.vstack(vecs)
 
 
+def extract_cpc_model(model):
+    cpc_input = Input((1, 1), dtype=np.int32)
+    cpc_model = model.get_layer(name='embedding_2')(cpc_input)
+    cpc_model = model.get_layer(name='flatten_1')(cpc_model)
+    cpc_model = model.get_layer(name='dense_2')(cpc_model)
+    cpc_model = model.get_layer(name='dense_3')(cpc_model)
+    cpc_model = Model(inputs=cpc_input, outputs=cpc_model)
+    cpc_model.compile(optimizer='adam', loss='mean_squared_error')
+    print('cpc_model summary: ')
+    cpc_model.summary()
+    return cpc_model
+
+
+def extract_text_model(model):
+    text_input = Input((None, 1), dtype=np.int32)
+    text_model = model.get_layer(name='embedding_1')(text_input)
+    text_model = model.get_layer(name='reshape_1')(text_model)
+    text_model = model.get_layer(name='lstm_1')(text_model)
+    text_model = model.get_layer(name='dense_1')(text_model)
+    text_model = model.get_layer(name='dense_3')(text_model)
+    text_model = Model(inputs=text_input, outputs=text_model)
+    text_model.compile(optimizer='adam', loss='mean_squared_error')
+    print('text_model summary: ')
+    text_model.summary()
+    return text_model
+
+
+def handle_batch(cnt, not_found):
+    all_cpc_encoding = encode_cpcs(cpc_model, cpc_idx_map, cpc_batch)
+    all_text_encoding = encode_text(text_model, word_idx_map, text_batch)
+    cpc_norm = norm_across_rows(all_cpc_encoding)
+    all_cpc_encoding = all_cpc_encoding / np.where(cpc_norm != 0, cpc_norm, 1)[:, np.newaxis]
+    text_norm = norm_across_rows(all_text_encoding)
+    all_text_encoding = all_text_encoding / np.where(text_norm != 0, text_norm, 1)[:, np.newaxis]
+
+    all_vecs = all_text_encoding + all_cpc_encoding
+    all_norms = norm_across_rows(all_vecs)
+    all_vecs = all_vecs / all_norms[:, np.newaxis]
+    all_vecs = all_vecs.tolist()
+    all_norms = all_norms.tolist()
+    data = []
+    for i in range(len(all_cpc_encoding)):
+        if all_norms[i] == 0:
+            not_found = not_found + 1
+        else:
+            vec = all_vecs[i]
+            data.append((id_batch[i], vec))
+        if cnt % 1000 == 999:
+            print("Completed: ", cnt, ' Not found: ', not_found)
+
+        cnt = cnt + 1
+
+    dataText = ','.join(ingest_cursor.mogrify('(%s,%s)', row).decode("utf-8") for row in data)
+    ingest_cursor.execute(ingest_sql_pre + dataText + ingest_sql_post)
+    return cnt, not_found
+
+
 def norm_across_rows(matrix):
     return np.sum(matrix ** 2, axis=-1) ** (1./2)
+
 
 model_file_32 = '/home/ehallmark/data/python/w2v_cpc_rnn_model_keras32.h5'
 model_file_64 = '/home/ehallmark/data/python/w2v_cpc_rnn_model_keras64.h5'
@@ -119,32 +179,14 @@ if __name__ == '__main__':
 
     word_idx_map, idx_word_map = load_word2vec_index_maps()
     cpc_idx_map, idx_cpc_map = load_cpc2vec_index_maps()
-    print('Num words found: ', len(word_idx_map))
+    print('Num words found: ', len(word_idx_map.keys()))
 
     encoder = load_model(model_file_128)
     model = encoder.model
     model.summary()
 
-    cpc_input = Input((1, 1), dtype=np.int32)
-    cpc_model = model.get_layer(name='embedding_2')(cpc_input)
-    cpc_model = model.get_layer(name='flatten_1')(cpc_model)
-    cpc_model = model.get_layer(name='dense_2')(cpc_model)
-    cpc_model = model.get_layer(name='dense_3')(cpc_model)
-    cpc_model = Model(inputs=cpc_input, outputs=cpc_model)
-    cpc_model.compile(optimizer='adam', loss='mean_squared_error')
-    print('cpc_model summary: ')
-    cpc_model.summary()
-
-    text_input = Input((None, 1), dtype=np.int32)
-    text_model = model.get_layer(name='embedding_1')(text_input)
-    text_model = model.get_layer(name='reshape_1')(text_model)
-    text_model = model.get_layer(name='lstm_1')(text_model)
-    text_model = model.get_layer(name='dense_1')(text_model)
-    text_model = model.get_layer(name='dense_3')(text_model)
-    text_model = Model(inputs=text_input, outputs=text_model)
-    text_model.compile(optimizer='adam', loss='mean_squared_error')
-    print('text_model summary: ')
-    text_model.summary()
+    cpc_model = extract_cpc_model(model)
+    text_model = extract_text_model(model)
 
     # load model
     cnt = 0
@@ -162,35 +204,12 @@ if __name__ == '__main__':
         cpc_batch.append(cpc_tree)
         id_batch.append(id)
         if len(text_batch) >= batch_size:
-            all_cpc_encoding = encode_cpcs(cpc_model, cpc_idx_map, cpc_batch)
-            all_text_encoding = encode_text(text_model, word_idx_map, text_batch)
-            cpc_norm = norm_across_rows(all_cpc_encoding)
-            all_cpc_encoding = all_cpc_encoding / np.where(cpc_norm != 0, cpc_norm, 1)[:, np.newaxis]
-            text_norm = norm_across_rows(all_text_encoding)
-            all_text_encoding = all_text_encoding / np.where(text_norm != 0, text_norm, 1)[:, np.newaxis]
-
-            all_vecs = all_text_encoding + all_cpc_encoding
-            all_norms = norm_across_rows(all_vecs)
-            all_vecs = all_vecs / all_norms[:, np.newaxis]
-            all_vecs = all_vecs.tolist()
-            all_norms = all_norms.tolist()
-            data = []
-            for i in range(len(all_cpc_encoding)):
-                if all_norms[i] == 0:
-                    not_found = not_found + 1
-                else:
-                    vec = all_vecs[i]
-                    data.append((id_batch[i], vec))
-                if cnt % 1000 == 999:
-                    print("Completed: ", cnt, ' Not found: ', not_found)
-
-                cnt = cnt + 1
-
-            dataText = ','.join(ingest_cursor.mogrify('(%s,%s)', row).decode("utf-8") for row in data)
-            ingest_cursor.execute(ingest_sql_pre + dataText + ingest_sql_post)
+            cnt, not_found = handle_batch(cnt, not_found)
             text_batch.clear()
             cpc_batch.clear()
             id_batch.clear()
+    if len(text_batch) > 0:
+        handle_batch(cnt, not_found)
 
     conn.close()
     conn2.close()
