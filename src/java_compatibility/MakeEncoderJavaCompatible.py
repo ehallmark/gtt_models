@@ -107,8 +107,8 @@ if __name__ == '__main__':
        where p.family_id != '-1' """)
 
     ingest_cursor = conn2.cursor()
-    ingest_sql_prefix = """insert into big_query_embedding_by_fam (family_id,enc) values """
-    ingest_sql_suffix = """ on conflict (family_id) do update set enc=excluded.enc"""
+    ingest_sql = """insert into big_query_embedding_by_fam (family_id,enc) values (%s,%s)
+        on conflict (family_id) do update set enc=excluded.enc"""
 
     print("Querying...")
 
@@ -162,7 +162,6 @@ if __name__ == '__main__':
             for i in range(len(all_cpc_encoding)):
                 text_encoding = all_text_encoding[i]
                 cpc_encoding = all_cpc_encoding[i]
-                vecs = []
                 if text_encoding is None and cpc_encoding is None:
                     not_found = not_found + 1
                 else:
@@ -174,13 +173,12 @@ if __name__ == '__main__':
                     else:
                         vec = cpc_encoding
                     vec = vec / np.linalg.norm(vec)
-                    vecs.append((id, vec.tolist()))
+
+                    ingest_cursor.execute(ingest_sql, (id, vec.tolist()))
                 if cnt % 1000 == 999:
                     print("Completed: ", cnt, ' Not found: ', not_found)
-                args_str = ','.join(ingest_cursor.mogrify("(%s,%s)", encoding) for encoding in vecs)
-                sql = ingest_sql_prefix + args_str + ingest_sql_suffix
-                ingest_cursor.execute(sql)
-                conn2.commit()
+                    conn2.commit()
+
                 cnt = cnt + 1
             text_batch.clear()
             cpc_batch.clear()
