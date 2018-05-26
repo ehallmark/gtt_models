@@ -103,7 +103,8 @@ if __name__ == '__main__':
     seed_cursor = conn.cursor("stream")
     seed_cursor.itersize = 100
     seed_cursor.execute("""select p.family_id, p.abstract, tree from big_query_patent_english_abstract as p
-       left outer join big_query_cpc_tree as c on (p.publication_number_full=c.publication_number_full)""")
+       left outer join big_query_cpc_tree as c on (p.publication_number_full=c.publication_number_full)
+       where p.family_id != '-1' """)
 
     ingest_cursor = conn2.cursor()
     ingest_sql_prefix = """insert into big_query_embedding_by_fam (family_id,enc) values """
@@ -158,7 +159,7 @@ if __name__ == '__main__':
         if len(text_batch) >= batch_size:
             all_cpc_encoding = encode_cpcs(cpc_model, cpc_idx_map, cpc_batch)
             all_text_encoding = encode_text(text_model, word_idx_map, text_batch)
-            for i in range(len(cpc_encoding)):
+            for i in range(len(all_cpc_encoding)):
                 text_encoding = all_text_encoding[i]
                 cpc_encoding = all_cpc_encoding[i]
                 vecs = []
