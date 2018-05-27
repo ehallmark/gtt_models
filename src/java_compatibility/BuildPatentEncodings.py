@@ -167,9 +167,9 @@ if __name__ == '__main__':
     conn2.autocommit = True
     seed_cursor = conn.cursor("stream")
     seed_cursor.itersize = 500
-    seed_cursor.execute("""select p.family_id, p.abstract, tree from big_query_patent_english_abstract as p
-       left outer join big_query_cpc_tree as c on (p.publication_number_full=c.publication_number_full)
-       where p.family_id != '-1' """)
+    seed_cursor.execute("""select coalesce(p.family_id,c.family_id), p.abstract, c.tree from big_query_patent_english_abstract as p j 
+       left outer join big_query_cpc_tree_by_fam as c on (p.family_id=c.family_id))
+       where p.family_id != '-1' and c.family_id != '-1' """)
 
     ingest_cursor = conn2.cursor()
     ingest_sql_pre = """insert into big_query_embedding_by_fam (family_id,enc) values """
