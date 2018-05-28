@@ -161,16 +161,19 @@ model_file_128 = '/home/ehallmark/data/python/w2v_cpc128_rnn_model_keras128.h5'
 
 if __name__ == '__main__':
     print("Starting to setup sql...")
-    redo_embeddings = False   # determines whether or not to redo embeddings
+    redo_embeddings = True   # determines whether or not to redo embeddings
     conn = psycopg2.connect("dbname='patentdb' user='postgres' host='localhost' password='password'")
     conn.autocommit = False
     conn2 = psycopg2.connect("dbname='patentdb' user='postgres' host='localhost' password='password'")
     conn2.autocommit = True
     seed_cursor = conn.cursor("stream")
     seed_cursor.itersize = 500
-    seed_sql = """select coalesce(p.family_id,c.family_id), p.abstract, c.tree from big_query_patent_english_abstract as p 
+    seed_sql = """select coalesce(p.family_id,c.family_id), p.abstract, c.tree from big_query_patent_english_abstract as p
        full outer join big_query_cpc_tree_by_fam as c on (p.family_id=c.family_id)
        where p.family_id != '-1' and c.family_id != '-1' """
+    # seed_sql = """select c.family_id, p.abstract, c.tree from big_query_patent_english_abstract as p
+    #       full outer join big_query_cpc_tree_by_fam as c on (p.family_id=c.family_id)
+    #       where p.family_id is null and c.family_id != '-1' """ # ONLY TO UPDATE MISSING VECS WITH ONLY CPCS
     if not redo_embeddings:
         seed_sql = seed_sql + ''' and not coalesce(p.family_id,c.family_id) 
                 in (select family_id from big_query_embedding_by_fam)'''
