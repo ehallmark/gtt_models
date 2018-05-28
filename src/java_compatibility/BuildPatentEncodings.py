@@ -169,12 +169,12 @@ if __name__ == '__main__':
     seed_cursor = conn.cursor("stream")
     seed_cursor.itersize = 500
     seed_sql = """select coalesce(p.family_id,c.family_id), p.abstract, c.tree from big_query_patent_english_abstract as p 
-       full outer join big_query_cpc_tree_by_fam as c on (p.family_id=c.family_id))
+       full outer join big_query_cpc_tree_by_fam as c on (p.family_id=c.family_id)
        where p.family_id != '-1' and c.family_id != '-1' """
     if not redo_embeddings:
         seed_sql = seed_sql + ''' and not coalesce(p.family_id,c.family_id) 
                 in (select family_id from big_query_embedding_by_fam)'''
-    
+
     seed_cursor.execute(seed_sql)
 
     ingest_cursor = conn2.cursor()

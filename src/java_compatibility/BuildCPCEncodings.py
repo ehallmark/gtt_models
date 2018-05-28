@@ -15,10 +15,6 @@ model_file_64 = '/home/ehallmark/data/python/w2v_cpc_rnn_model_keras64.h5'
 model_file_128 = '/home/ehallmark/data/python/w2v_cpc128_rnn_model_keras128.h5'
 
 
-def cpc_sort(val):
-    return len(val)
-
-
 def encode_cpcs(model, cpc_to_idx, cpc_trees):
     all_cpcs = []
     all_weights = []
@@ -30,12 +26,12 @@ def encode_cpcs(model, cpc_to_idx, cpc_trees):
             invalid.add(i)
             intervals.append(0)
         else:
+            cpc_weights = [len(cpc.replace('/00', '/')) for cpc in cpcs if cpc in cpc_to_idx]
             cpcs = [cpc_to_idx[cpc] for cpc in cpcs if cpc in cpc_to_idx]
             intervals.append(len(cpcs))
-            cpcs.sort(key=cpc_sort)
             for j in range(len(cpcs)):
                 cpc = cpcs[j]
-                all_weights.append(np.exp(j))
+                all_weights.append(np.exp(cpc_weights[j]))
                 all_cpcs.append(cpc)
 
     x = np.array(all_cpcs).reshape((len(all_cpcs), 1, 1))
