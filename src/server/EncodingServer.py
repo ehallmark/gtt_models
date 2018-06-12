@@ -1,3 +1,5 @@
+import sys
+sys.path.insert(0, "/home/ehallmark/repos/gtt_models/src")
 from flask import Flask, jsonify
 from flask import request
 import numpy as np
