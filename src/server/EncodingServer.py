@@ -8,12 +8,12 @@ from src.java_compatibility.BuildPatentEncodings import load_model, load_word2ve
 app = Flask(__name__)
 
 model_file_128 = '/home/ehallmark/data/python/w2v_cpc128_rnn_model_keras128.h5'
-encoder = load_model(model_file_128)
-model = encoder.model
-model.summary()
+#encoder = load_model(model_file_128)
+#model = encoder.model
+#model.summary()
 
-text_model = extract_text_model(model)
-word_idx_map = load_word2vec_index_maps()
+text_model = None #extract_text_model(model)
+word_idx_map = None #load_word2vec_index_maps()
 
 @app.route("/encode")
 def encode():
