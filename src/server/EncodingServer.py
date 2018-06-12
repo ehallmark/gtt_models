@@ -1,8 +1,5 @@
 from flask import Flask, jsonify
 from flask import request
-from src.models.Word2VecModel import load_cpc_to_index_map
-import psycopg2
-import pandas as pd
 import numpy as np
 from src.java_compatibility.BuildPatentEncodings import load_model, load_word2vec_index_maps, norm_across_rows, encode_text, extract_text_model
 
