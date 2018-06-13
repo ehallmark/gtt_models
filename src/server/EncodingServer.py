@@ -15,7 +15,8 @@ model.summary()
 text_model = extract_text_model(model)
 word_idx_map = load_word2vec_index_maps()
 
-@app.route("/encode")
+
+@app.route('/encode', methods=['GET', 'POST'])
 def encode():
     to_encode = request.args.get('text', type=str)
     print('Received text: ', to_encode)
