@@ -21,7 +21,7 @@ def load_word2vec_index_maps():
     for row in word2vec_index:
         idx = int(row[1])
         word = str(row[0])
-        print('word: ', word, ' idx: ',idx)
+        #print('word: ', word, ' idx: ',idx)
         if idx == 0:
             print("Found 0 index in word2vec... 0 index should be the mask index (i.e. not a word)."
                   + " Try rerunning IngestWord2VecToText java program.")
