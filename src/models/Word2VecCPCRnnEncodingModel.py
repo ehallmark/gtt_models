@@ -106,7 +106,7 @@ def create_rnn_encoding_model(Fcpc, Fx, Tx, cpc2vec_data, word2vec_data, embeddi
 
 def load_rnn_encoding_model(model_file, lr=0.001,
                             decay=0,
-                            loss_func='categorical_crossentropy', compile=True):
+                            loss_func='categorical_crossentropy', compile=False):
     print("Using previous model...")
     model = k.models.load_model(model_file, compile=False)
     if compile:
