@@ -60,7 +60,7 @@ def encode_text(model, word_to_idx, texts):
     y = model.predict(x)
     for i in range(y.shape[0]):
         if i in invalid:
-            print('Invalid: '+invalid)
+            print('Invalid')
             all_vectors.append([0] * 128)
         else:
             all_vectors.append(y[i, :].flatten())
