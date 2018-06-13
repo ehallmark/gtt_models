@@ -15,7 +15,6 @@ model.summary()
 
 text_model = extract_text_model(model)
 graph = tf.get_default_graph()
-text_model.summary()
 word_idx_map = load_word2vec_index_maps()
 
 
@@ -27,9 +26,12 @@ def encode():
     if to_encode is not None:
         with graph.as_default():
             all_text_encoding = encode_text(text_model, word_idx_map, [to_encode])
+            print('Enc: ', all_text_encoding)
             text_norm = norm_across_rows(all_text_encoding)
             all_text_encoding = all_text_encoding / np.where(text_norm != 0, text_norm, 1)[:, np.newaxis]
-            if all_text_encoding.shape[0]>0:
+            if all_text_encoding.max() == all_text_encoding.min():
+                encoding = []
+            elif all_text_encoding.shape[0] > 0:
                 encoding = all_text_encoding.flatten().tolist()
     print('Encoding found: ', encoding)
     return jsonify(encoding)

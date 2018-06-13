@@ -55,10 +55,12 @@ def encode_text(model, word_to_idx, texts):
             elif len(words) < 128:
                 words = ([0] * (128 - len(words))) + words
         all_words.append(words)
+    print('all_words: ', all_words)
     x = np.array(all_words).reshape((len(all_words), 128, 1))
     y = model.predict(x)
     for i in range(y.shape[0]):
         if i in invalid:
+            print('Invalid: '+invalid)
             all_vectors.append([0] * 128)
         else:
             all_vectors.append(y[i, :].flatten())
