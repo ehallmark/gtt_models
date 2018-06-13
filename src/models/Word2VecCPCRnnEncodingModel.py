@@ -167,9 +167,9 @@ class RnnEncoder:
         self.model = load_rnn_encoding_model(self.filepath, lr=self.lr, decay=self.decay, loss_func=self.loss_func)
 
 
-vocab_vector_file_txt = '/home/ehallmark/Downloads/word2vec256_vectors.txt'
-vocab_vector_file_h5 = '/home/ehallmark/Downloads/word2vec256_vectors.h5.npy'  # h5 extension faster? YES by alot
-vocab_index_file = '/home/ehallmark/Downloads/word2vec256_index.txt'
+vocab_vector_file_txt = '/home/ehallmark/data/python/word2vec256_vectors.txt'
+vocab_vector_file_h5 = '/home/ehallmark/data/python/word2vec256_vectors.h5.npy'  # h5 extension faster? YES by alot
+vocab_index_file = '/home/ehallmark/data/python/word2vec256_index.txt'
 # model_file_32 = '/home/ehallmark/data/python/w2v_cpc_rnn_model_keras32.h5'
 model_file_64 = '/home/ehallmark/data/python/w2v_cpc128_rnn_model_keras64.h5'
 model_file_128 = '/home/ehallmark/data/python/w2v_cpc128_rnn_model_keras128.h5'

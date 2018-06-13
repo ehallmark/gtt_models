@@ -13,7 +13,7 @@ def load_model(model_file):
 
 
 def load_word2vec_index_maps():
-    word2vec_index_file = '/home/ehallmark/Downloads/word2vec256_index.txt'
+    word2vec_index_file = '/home/ehallmark/data/python/word2vec256_index.txt'
     word2vec_index = np.array(pd.read_csv(word2vec_index_file, delimiter=',', header=None))
     print(word2vec_index[0:10])
     word_to_index_map = {}
