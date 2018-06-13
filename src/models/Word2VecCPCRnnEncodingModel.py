@@ -135,10 +135,10 @@ class RnnEncoder:
         self.hidden_layer_size = hidden_layer_size
         self.model = None
         if load_previous_model:
-            try:
-                self.load()
-            except:
-                print('Could not fine previous model... Creating new one now.')
+           # try:
+            self.load()
+           # except:
+           #     print('Could not fine previous model... Creating new one now.')
         if self.model is None:
             self.model = create_rnn_encoding_model(
                 cpc2vec_size,
