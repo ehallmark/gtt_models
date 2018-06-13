@@ -13,6 +13,7 @@ model = encoder.model
 model.summary()
 
 text_model = extract_text_model(model)
+print(text_model.summary())
 word_idx_map = load_word2vec_index_maps()
 
 
