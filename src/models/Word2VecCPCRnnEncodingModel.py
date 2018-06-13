@@ -21,7 +21,8 @@ def pretrained_embedding_layer(emb_matrix, input_length):
     Returns:
     embedding_layer -- pretrained layer Keras instance
     """
-    vocab_len = vocab_len + 1  # adding 1 to fit Keras embedding (requirement)
+    vocab_len = emb_matrix.shape[0]
+    # vocab_len = vocab_len + 1  # adding 1 to fit Keras embedding (requirement)
     emb_dim = emb_matrix.shape[1]  # define dimensionality of your word vectors
     print("Found word2vec dimensions: ", emb_dim)
 
