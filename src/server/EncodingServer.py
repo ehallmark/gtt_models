@@ -15,7 +15,8 @@ model.summary()
 
 text_model = extract_text_model(model)
 graph = tf.get_default_graph()
-word_idx_map = load_word2vec_index_maps()
+word_idx_map, index_to_word_map = load_word2vec_index_maps()
+print('Num words: ', len(word_idx_map))
 
 
 @app.route('/encode', methods=['GET', 'POST'])
