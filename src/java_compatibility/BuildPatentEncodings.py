@@ -43,6 +43,7 @@ def encode_text(model, word_to_idx, texts):
         text = texts[i]
         if text is not None:
             words = re.sub('[^a-z ]', ' ', text.lower()).split()
+            print('Word split: ', words)
             words = [word_to_idx[word] for word in words if word in word_to_idx]
         else:
             words = []
