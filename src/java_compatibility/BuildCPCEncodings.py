@@ -79,7 +79,8 @@ if __name__ == '__main__':
     conn2.autocommit = True
     seed_cursor = conn.cursor("stream")
     seed_cursor.itersize = 500
-    seed_cursor.execute("""select code, tree from big_query_cpc_definition""")
+    seed_cursor.execute("""select code, tree from big_query_cpc_definition as c full outer join big_query_embedding_cpc as e
+        on (c.code=e.code) where e.code is null """)
 
     ingest_cursor = conn2.cursor()
     ingest_sql_pre = """insert into big_query_embedding_cpc (code,enc) values """
