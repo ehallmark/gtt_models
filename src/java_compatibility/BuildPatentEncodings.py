@@ -189,7 +189,7 @@ if __name__ == '__main__':
 
     ingest_cursor = conn2.cursor()
     ingest_sql_pre = """insert into big_query_embedding_by_fam (family_id,enc) values """
-    ingest_sql_post = """ on conflict on constraint family_id_pkey do update set enc=excluded.enc"""
+    ingest_sql_post = """ on conflict on constraint big_query_embedding_by_fam_family_id_pkey do update set enc=excluded.enc"""
 
     print("Querying...")
 
