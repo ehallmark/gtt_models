@@ -1,3 +1,5 @@
+import sys
+sys.path.insert(0, "/home/ehallmark/repos/gtt_models")
 from src.models.Word2VecCPCRnnEncodingModel import RnnEncoder
 import pandas as pd
 import psycopg2
