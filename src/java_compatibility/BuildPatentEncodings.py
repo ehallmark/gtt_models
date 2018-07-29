@@ -18,7 +18,7 @@ def load_model(model_file):
 def load_word2vec_index_maps():
     word2vec_index_file = '/home/ehallmark/data/python/word2vec256_index.txt'
     word2vec_index = np.array(pd.read_csv(word2vec_index_file, delimiter=',', header=None))
-    print(word2vec_index[0:10])
+    #print(word2vec_index[0:10])
     word_to_index_map = {}
     index_to_word_map = {}
     for row in word2vec_index:
@@ -46,7 +46,7 @@ def encode_text(model, word_to_idx, texts):
         text = texts[i]
         if text is not None:
             words = re.sub('[^a-z ]', ' ', text.lower()).split()
-            print('Word split: ', words)
+            #print('Word split: ', words)
             words = [word_to_idx[word] for word in words if word in word_to_idx]
         else:
             words = []
@@ -59,7 +59,7 @@ def encode_text(model, word_to_idx, texts):
             elif len(words) < 128:
                 words = ([0] * (128 - len(words))) + words
         all_words.append(words)
-    print('all_words: ', all_words)
+    #print('all_words: ', all_words)
     x = np.array(all_words).reshape((len(all_words), 128, 1))
     y = model.predict(x)
     for i in range(y.shape[0]):
@@ -189,7 +189,7 @@ if __name__ == '__main__':
 
     ingest_cursor = conn2.cursor()
     ingest_sql_pre = """insert into big_query_embedding_by_fam (family_id,enc) values """
-    ingest_sql_post = """ on conflict (family_id) do update set enc=excluded.enc"""
+    ingest_sql_post = """ on conflict on constraint family_id_pkey do update set enc=excluded.enc"""
 
     print("Querying...")
 
