@@ -12,7 +12,7 @@ random.seed(235)
 num_tests = 25000
 data_file = 'join_data.h5'
 cpc_definition_file = 'cpc_definition.h5'
-use_cache = False
+use_cache = True
 
 def random_select(arr):
     if len(arr) == 0:
@@ -77,16 +77,17 @@ test_data = (cpc_encod_test, wipo_encod_test)
 print('Final wipo shape', wipo_encod.shape)
 
 
-def generator(batch_size):
-    wipo_encod_sample = np.zeros([batch_size, len(wipo_encoder.classes_)])
-    cpc_encod_sample = np.zeros([batch_size, len(cpc_encoder.classes_)])
-    for i in range(batch_size):
-        r = random.randint(0, data.shape[0])
-        wipo_encod_sample[i] = wipo_encod[r]
-        cpc = cpc_encoder.transform(data['tree'].iloc[r])
-        for j in range(len(cpc)):
-            batch_size[i, cpc[j]] = 1
-    return cpc_encod_sample, wipo_encod_sample
+def generator(batch_size=256):
+    while True:
+        wipo_encod_sample = np.zeros([batch_size, len(wipo_encoder.classes_)])
+        cpc_encod_sample = np.zeros([batch_size, len(cpc_encoder.classes_)])
+        for i in range(batch_size):
+            r = random.randint(0, data.shape[0])
+            wipo_encod_sample[i] = wipo_encod[r]
+            cpc = cpc_encoder.transform(data['tree'].iloc[r])
+            for j in range(len(cpc)):
+                cpc_encod_sample[i, cpc[j]] = 1
+        yield(cpc_encod_sample, wipo_encod_sample)
 
 
 model_file = 'wipo_prediction_model.h5'
@@ -119,7 +120,7 @@ errors.append(avg_error)
 for i in range(30):
     #model.fit(cpc_encod, wipo_encod, batch_size=batch_size, initial_epoch=i, epochs=i + 1, validation_data=test_data,
     #          shuffle=True)
-    model.fit_generator(generator, steps_per_epoch=data.shape[0]/batch_size, initial_epoch=i, epochs=i + 1, validation_data=test_data)
+    model.fit_generator(generator(), steps_per_epoch=data.shape[0]/batch_size, initial_epoch=i, epochs=i + 1, validation_data=test_data)
     avg_error = test_model(model, test_data[0], test_data[1])
     print('Average error: ', avg_error)
     if best_error is None or best_error > avg_error:
