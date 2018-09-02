@@ -9,16 +9,30 @@ from keras.optimizers import Adam
 import sklearn.metrics as metrics
 
 num_tests = 25000
+data_file = 'join_data.h5'
+cpc_definition_file = 'cpc_definition.h5'
+use_cache = True
+
 
 def test_model(model, x, y):
     y_pred = model.predict(x)
     return metrics.log_loss(y, y_pred)
 
+
 print('Loading data')
-data = pd.read_sql('select c.publication_number_full, wipo_technology, code from big_query_wipo_by_pub_flat as w join big_query_cpc_tree as c on (c.publication_number_full=w.publication_number_full)', conn)
-print('Loading cpc definitions')
-cpc_definitions_sql = pd.read_sql('select code from big_query_cpc_definition where level < 8', conn)
+if use_cache:
+    data = pd.read_hdf(data_file, 'data')
+    cpc_definitions_sql = pd.read_hdf(cpc_definition_file, 'definition')
+else:
+    data = pd.read_sql('select c.publication_number_full, wipo_technology, code from big_query_wipo_by_pub_flat as w join big_query_cpc_tree as c on (c.publication_number_full=w.publication_number_full)', conn)
+    data.to_hdf(data_file, 'data', mode='w')
+    print('Loading cpc definitions')
+    cpc_definitions_sql = pd.read_sql('select code from big_query_cpc_definition where level < 8', conn)
+    cpc_definitions_sql.to_hdf(cpc_definition_file, 'definition', mode='w')
+
 print('Done')
+
+print('Data size: ', data.shape)
 
 cpc_encoder = preprocessing.LabelEncoder()
 cpc_encoder.fit(list(cpc_definitions_sql['code'].iloc[:]))
