@@ -3,7 +3,7 @@ import pandas as pd
 conn = create_engine("postgresql://localhost/patentdb?user=postgres&password=password")
 from sklearn import preprocessing
 import numpy as np
-from keras.layers import Dense, Reshape, Bidirectional, Add, Multiply, Recurrent, Concatenate, LSTM, Lambda, Input, BatchNormalization, Dropout
+from keras.layers import Dense, Reshape, Bidirectional, Add, Multiply, Concatenate, Lambda, Input, BatchNormalization, Dropout
 from keras.models import Model
 from keras.optimizers import Adam
 import sklearn.metrics as metrics
@@ -14,10 +14,8 @@ def test_model(model, x, y):
     y_pred = model.predict(x)
     return metrics.log_loss(y, y_pred)
 
-print('Loading wipo data')
-wipo_sql = pd.read_sql('select publication_number_full, wipo_technology from big_query_wipo_by_pub_flat', conn)
-print('Loading cpc data')
-cpc_sql = pd.read_sql('select publication_number_full, tree from big_query_cpc_tree', conn)
+print('Loading data')
+data = pd.read_sql('select p.publication_number_full, wipo_technology, code from big_query_wipo_by_pub_flat as w join big_query_cpc_tree as c on (c.publication_number_full=w.publication_number_full)', conn)
 print('Loading cpc definitions')
 cpc_definitions_sql = pd.read_sql('select code from big_query_cpc_definition where level < 8', conn)
 print('Done')
@@ -26,18 +24,8 @@ cpc_encoder = preprocessing.LabelEncoder()
 cpc_encoder.fit(list(cpc_definitions_sql['code'].iloc[:]))
 
 wipo_encoder = preprocessing.LabelEncoder()
-wipo_encoder.fit(list(wipo_sql['wipo_technology'].iloc[:]))
+wipo_encoder.fit(list(data['wipo_technology'].iloc[:]))
 
-print('Merging data')
-# join data
-data = pd.DataFrame.merge(
-    wipo_sql,
-    cpc_sql,
-    'inner',
-    left_on=['publication_number_full'],
-    right_on=['publication_number_full'],
-    validate='m:1'
-)
 data = data.sample(frac=1).reset_index(drop=True)  # shuffle
 test_data = data.iloc[-num_tests:]
 data = data.iloc[0:-num_tests]
