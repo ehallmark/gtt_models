@@ -30,7 +30,7 @@ if use_cache:
     data = pd.read_hdf(data_file, 'data')
     cpc_definitions_sql = pd.read_hdf(cpc_definition_file, 'definition')
 else:
-    cpc_definitions_sql = pd.read_sql('select code from big_query_cpc_definition where char_length(code) < 9 union select \'A\' ', conn)
+    cpc_definitions_sql = pd.read_sql('select code from big_query_cpc_definition where char_length(code) < 8 union select \'A\' ', conn)
     cpc_definitions_sql.to_hdf(cpc_definition_file, 'definition', mode='w')
     data = pd.read_sql('select c.publication_number_full, wipo_technology, tree from big_query_wipo_by_pub_flat as w join big_query_cpc_tree as c on (c.publication_number_full=w.publication_number_full)', conn)
     data['tree'] = [[d for d in dat if len(d) < 8] for dat in data['tree']]
@@ -66,7 +66,12 @@ for i in range(test_data.shape[0]):
     wipo_encod_test[i, wipo_test[i]] = 1
 
 print('Building cpc dataset')
+cpc_encod = np.zeros([data.shape[0], len(cpc_encoder.classes_)])
 cpc_encod_test = np.zeros([test_data.shape[0], len(cpc_encoder.classes_)])
+for i in range(data.shape[0]):
+    cpc = cpc_encoder.transform(data['tree'].iloc[i])
+    for j in range(len(cpc)):
+        cpc_encod[i, cpc[j]] = 1
 for i in range(test_data.shape[0]):
     cpc_test = cpc_encoder.transform(test_data['tree'].iloc[i])
     for j in range(len(cpc_test)):
@@ -91,7 +96,7 @@ def generator(batch_size=256):
 
 
 model_file = 'wipo_prediction_model.h5'
-hidden_units = 1024
+hidden_units = 512
 num_layers = 3
 dropout = 0
 batch_size = 256
@@ -118,9 +123,9 @@ best_error = avg_error
 errors = []
 errors.append(avg_error)
 for i in range(30):
-    #model.fit(cpc_encod, wipo_encod, batch_size=batch_size, initial_epoch=i, epochs=i + 1, validation_data=test_data,
-    #          shuffle=True)
-    model.fit_generator(generator(), steps_per_epoch=data.shape[0]/batch_size, initial_epoch=i, epochs=i + 1, validation_data=test_data)
+    model.fit(cpc_encod, wipo_encod, batch_size=batch_size, initial_epoch=i, epochs=i + 1, validation_data=test_data,
+              shuffle=True)
+    #model.fit_generator(generator(batch_size), steps_per_epoch=data.shape[0]/batch_size, initial_epoch=i, epochs=i + 1, validation_data=test_data)
     avg_error = test_model(model, test_data[0], test_data[1])
     print('Average error: ', avg_error)
     if best_error is None or best_error > avg_error:
