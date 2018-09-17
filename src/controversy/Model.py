@@ -1,10 +1,14 @@
 import numpy as np
 import pandas as pd
-from keras.layers import Embedding
+from keras.layers import Embedding, Reshape, LSTM, Input, Dense, Concatenate
+from keras.models import Model
+from keras.optimizers import Adam
+from sklearn import metrics
 
-vocab_vector_file_h5 = '/home/ehallmark/data/python/word2vec256_vectors.h5.npy'  # h5 extension faster? YES by alot
-word2vec_index_file = '/home/ehallmark/data/python/word2vec256_index.txt'
-vocab_size = 477909
+
+def test_model(model, x, y):
+    y_pred = model.predict(x)
+    return metrics.log_loss(y, y_pred)
 
 
 def convert_sentences_to_inputs(sentences, word_to_index_map, max_sequence_length):
@@ -19,6 +23,13 @@ def convert_sentences_to_inputs(sentences, word_to_index_map, max_sequence_lengt
     return x
 
 
+def binary_to_categorical(bin):
+    x = np.zeros(len(bin), 2)
+    for i in range(len(bin)):
+        x[i, int(bin[i])] = 1.0
+    return x
+
+
 def get_data(max_sequence_length, word_to_index_map, num_validations=25000):
     # load the data used to train/validate model
     print('Loading data...')
@@ -27,8 +38,8 @@ def get_data(max_sequence_length, word_to_index_map, num_validations=25000):
     x_val = x.iloc[-num_validations:, :]
     x = x.iloc[0:num_validations, :]
 
-    y = np.array(x['controversial']).flatten().astype(np.float32)
-    y_val = np.array(x_val['controversial']).flatten().astype(np.float32)
+    y = binary_to_categorical(np.array(x['controversial']).flatten())
+    y_val = binary_to_categorical(np.array(x_val['controversial']).flatten())
 
     x1 = convert_sentences_to_inputs(x['parent_text'], word_to_index_map, max_sequence_length)
     x2 = convert_sentences_to_inputs(x['text'], word_to_index_map, max_sequence_length)
@@ -77,6 +88,11 @@ def load_word2vec_model_layer(model_file, sequence_length):
 
 
 if __name__ == "__main__":
+    vocab_vector_file_h5 = '/home/ehallmark/data/python/word2vec256_vectors.h5.npy'  # h5 extension faster? YES by alot
+    word2vec_index_file = '/home/ehallmark/data/python/word2vec256_index.txt'
+    model_file = '/home/ehallmark/data/python/controversy_model.nn'
+    vocab_size = 477909
+
     initial_epoch = 0  # allows resuming training from particular epoch
     word2vec_size = 256  # size of the embedding
     max_sequence_length = 128  # max number of words to consider in the comment
@@ -96,4 +112,51 @@ if __name__ == "__main__":
     (data, data_val) = get_data(max_sequence_length, word_to_index_map, num_validations)
 
     x, y = data
+
+    # build model
+    x1_orig = Input(shape=(max_sequence_length, 1), dtype=np.int32)
+    x2_orig = Input(shape=(max_sequence_length, 1), dtype=np.int32)
+
+    x1 = embedding_layer(x1_orig)
+    x2 = embedding_layer(x2_orig)
+    x1 = Reshape((max_sequence_length, word2vec_size))(x1)
+    x2 = Reshape((max_sequence_length, word2vec_size))(x2)
+
+    x1 = LSTM(hidden_layer_size, activation='tanh', return_sequences=False)(x1)
+    x2 = LSTM(hidden_layer_size, activation='tanh', return_sequences=False)(x2)
+
+    model = Dense(hidden_layer_size, activation='tanh')(Concatenate()([x1, x2]))
+    model = Dense(2, activation='softmax')(model)
+
+    # compile model
+    model = Model(inputs=[x1_orig, x2_orig], outputs=model)
+    model.compile(loss="binary_crossentropy", optimizer=Adam(lr=learning_rate, decay=decay), metrics=['accuracy'])
+    model.summary()
+
+    # train model
+    avg_error = test_model(model, data_val[0], data_val[1])
+    print("Starting model score: ", avg_error)
+    prev_error = avg_error
+    best_error = avg_error
+    errors = list()
+    errors.append(avg_error)
+    for i in range(30):
+        model.fit(x, y, batch_size=batch_size, initial_epoch=i, epochs=i + 1, validation_data=data_val,
+                  shuffle=True)
+        avg_error = test_model(model, data_val[0], data_val[1])
+
+        print('Average error: ', avg_error)
+        if best_error is None or best_error > avg_error:
+            best_error = avg_error
+            # save
+            model.save(model_file)
+            print('Saved.')
+        prev_error = avg_error
+        errors.append(prev_error)
+
+    print(model.summary())
+    print('Most recent model error: ', prev_error)
+    print('Best model error: ', best_error)
+    print("Error history: ", errors)
+
 
