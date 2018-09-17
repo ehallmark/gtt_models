@@ -140,7 +140,7 @@ if __name__ == "__main__":
     best_error = avg_error
     errors = list()
     errors.append(avg_error)
-    for i in range(30):
+    for i in range(epochs):
         model.fit(x, y, batch_size=batch_size, initial_epoch=i, epochs=i + 1, validation_data=data_val,
                   shuffle=True)
         avg_error = test_model(model, data_val[0], data_val[1])
