@@ -38,8 +38,8 @@ def get_data(max_sequence_length, word_to_index_map, num_validations=25000):
     x_val = x.iloc[-num_validations:, :]
     x = x.iloc[0:num_validations, :]
 
-    y = binary_to_categorical(np.array(x['controversial']).flatten())
-    y_val = binary_to_categorical(np.array(x_val['controversial']).flatten())
+    y = binary_to_categorical(np.array([row['controversiality'] > 0 or row['score'] < 0 for row in x.iloc[:]]).astype(np.int32))
+    y_val = binary_to_categorical(np.array([row['controversiality'] > 0 or row['score'] < 0 for row in x_val.iloc[:]]).astype(np.int32))
 
     x1 = convert_sentences_to_inputs(x['parent_text'], word_to_index_map, max_sequence_length)
     x2 = convert_sentences_to_inputs(x['text'], word_to_index_map, max_sequence_length)
