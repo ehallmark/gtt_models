@@ -12,7 +12,7 @@ def test_model(model, x, y):
 
 
 def convert_sentences_to_inputs(sentences, word_to_index_map, max_sequence_length):
-    x = np.zeros(len(sentences), max_sequence_length)
+    x = np.zeros((len(sentences), max_sequence_length))
     for i in range(len(sentences)):
         sentence = sentences[i]
         words = sentence.lower().split("\\s+")
@@ -24,7 +24,7 @@ def convert_sentences_to_inputs(sentences, word_to_index_map, max_sequence_lengt
 
 
 def binary_to_categorical(bin):
-    x = np.zeros(len(bin), 3)
+    x = np.zeros((len(bin), 3))
     for i in range(len(bin)):
         x[i, int(bin[i])] = 1.0
     return x
@@ -47,13 +47,16 @@ def get_data(max_sequence_length, word_to_index_map, num_validations=25000):
     x2 = pd.read_csv('/home/ehallmark/Downloads/comment_comments2.csv', sep=',')
 
     x = x0.append(x1, ignore_index=True).append(x2, ignore_index=True)
-    x = x.sample(frac=1, replace=False, inplace=True)
+    x = x.sample(frac=1, replace=False)
 
-    x_val = x.iloc[-num_validations:, :]
-    x = x.iloc[0:num_validations, :]
+    x_val = x[-num_validations:]
+    x = x[0:num_validations]
 
-    y = binary_to_categorical(np.array([label_for_row(row) for row in x.iloc[:]]).astype(np.int32))
-    y_val = binary_to_categorical(np.array([label_for_row(row) for row in x_val.iloc[:]]).astype(np.int32))
+    print('Train shape:', x.shape)
+    print('Val shape: ', x_val.shape)
+
+    y = binary_to_categorical(np.array([label_for_row(row) for _, row in x.iterrows()]).astype(np.int32))
+    y_val = binary_to_categorical(np.array([label_for_row(row) for _, row in x_val.iterrows()]).astype(np.int32))
 
     x1 = convert_sentences_to_inputs(x['parent_text'], word_to_index_map, max_sequence_length)
     x2 = convert_sentences_to_inputs(x['text'], word_to_index_map, max_sequence_length)
