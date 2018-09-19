@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-from keras.layers import Embedding, Reshape, LSTM, Input, Dense, Concatenate
+from keras.layers import Embedding, Reshape, LSTM, Input, Dense, Concatenate, Bidirectional
 from keras.models import Model
 from keras.optimizers import Adam
 from sklearn import metrics
@@ -42,7 +42,12 @@ def label_for_row(row):
 def get_data(max_sequence_length, word_to_index_map, num_validations=25000):
     # load the data used to train/validate model
     print('Loading data...')
-    x = pd.read_csv('/home/ehallmark/Downloads/comment_comments.csv', sep=',').sample(frac=1, replace=False, inplace=True)
+    x0 = pd.read_csv('/home/ehallmark/Downloads/comment_comments0.csv', sep=',')
+    x1 = pd.read_csv('/home/ehallmark/Downloads/comment_comments1.csv', sep=',')
+    x2 = pd.read_csv('/home/ehallmark/Downloads/comment_comments2.csv', sep=',')
+
+    x = x0.append(x1, ignore_index=True).append(x2, ignore_index=True)
+    x = x.sample(frac=1, replace=False, inplace=True)
 
     x_val = x.iloc[-num_validations:, :]
     x = x.iloc[0:num_validations, :]
@@ -106,7 +111,6 @@ if __name__ == "__main__":
     word2vec_size = 256  # size of the embedding
     max_sequence_length = 128  # max number of words to consider in the comment
     learning_rate = 0.001  # defines the learning rate (initial) for the model
-    min_learning_rate = 0.000001  # defines the minimum learning rate
     decay = 0  # weight decay
     batch_size = 512  # defines the mini batch size
     epochs = 10  # defines the number of full passes through the training data
@@ -131,8 +135,8 @@ if __name__ == "__main__":
     x1 = Reshape((max_sequence_length, word2vec_size))(x1)
     x2 = Reshape((max_sequence_length, word2vec_size))(x2)
 
-    x1 = LSTM(hidden_layer_size, activation='tanh', return_sequences=False)(x1)
-    x2 = LSTM(hidden_layer_size, activation='tanh', return_sequences=False)(x2)
+    x1 = Bidirectional(LSTM(hidden_layer_size, activation='tanh', return_sequences=False)(x1))
+    x2 = Bidirectional(LSTM(hidden_layer_size, activation='tanh', return_sequences=False)(x2))
 
     model = Dense(hidden_layer_size, activation='tanh')(Concatenate()([x1, x2]))
     model = Dense(3, activation='softmax')(model)
