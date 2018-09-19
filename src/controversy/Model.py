@@ -15,14 +15,15 @@ def convert_sentences_to_inputs(sentences, word_to_index_map, max_sequence_lengt
     x = np.zeros((len(sentences), max_sequence_length))
     for i in range(len(sentences)):
         sentence = sentences.iloc[i]
-        words = sentence.lower().split("\\s+")
+        words = str(sentence).lower().split("\\s+")
+        #print(i, sentence)
         idx = 0
         for j in range(max_sequence_length-len(words), max_sequence_length, 1):
             word = words[idx]
             idx += 1
             if word in word_to_index_map:
                 x[i, j] = word_to_index_map[word]+1  # don't forget to add 1 to account for mask at index 0
-    return x
+    return x.reshape((len(sentences), max_sequence_length, 1))
 
 
 def binary_to_categorical(bin):
@@ -128,11 +129,6 @@ if __name__ == "__main__":
     word_to_index_map, index_to_word_map = load_word2vec_index_maps(word2vec_index_file)
     embedding_layer = load_word2vec_model_layer(model_file=vocab_vector_file_h5, sequence_length=max_sequence_length)
 
-    print('Getting data...')
-    (data, data_val) = get_data(max_sequence_length, word_to_index_map, num_validations)
-
-    x, y = data
-
     # build model
     x1_orig = Input(shape=(max_sequence_length, 1), dtype=np.int32)
     x2_orig = Input(shape=(max_sequence_length, 1), dtype=np.int32)
@@ -142,8 +138,8 @@ if __name__ == "__main__":
     x1 = Reshape((max_sequence_length, word2vec_size))(x1)
     x2 = Reshape((max_sequence_length, word2vec_size))(x2)
 
-    x1 = Bidirectional(LSTM(hidden_layer_size, activation='tanh', return_sequences=False)(x1))
-    x2 = Bidirectional(LSTM(hidden_layer_size, activation='tanh', return_sequences=False)(x2))
+    x1 = LSTM(hidden_layer_size, activation='tanh', return_sequences=False)(x1)
+    x2 = LSTM(hidden_layer_size, activation='tanh', return_sequences=False)(x2)
 
     model = Dense(hidden_layer_size, activation='tanh')(Concatenate()([x1, x2]))
     model = Dense(3, activation='softmax')(model)
@@ -152,6 +148,12 @@ if __name__ == "__main__":
     model = Model(inputs=[x1_orig, x2_orig], outputs=model)
     model.compile(loss="categorical_crossentropy", optimizer=Adam(lr=learning_rate, decay=decay), metrics=['accuracy'])
     model.summary()
+
+    # load training data
+    print('Getting data...')
+    (data, data_val) = get_data(max_sequence_length, word_to_index_map, num_validations)
+
+    x, y = data
 
     # train model
     avg_error = test_model(model, data_val[0], data_val[1])
