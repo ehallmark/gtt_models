@@ -4,6 +4,7 @@ from keras.layers import Embedding, Reshape, LSTM, Input, Dense, Concatenate, Bi
 from keras.models import Model
 from keras.optimizers import Adam
 from sklearn import metrics
+import re
 
 
 def test_model(model, x, y):
@@ -15,8 +16,7 @@ def convert_sentences_to_inputs(sentences, word_to_index_map, max_sequence_lengt
     x = np.zeros((len(sentences), max_sequence_length))
     for i in range(len(sentences)):
         sentence = sentences.iloc[i]
-        words = str(sentence).lower().split("\\s+")
-        #print(i, sentence)
+        words = re.sub(r'\W+', ' ', str(sentence).lower()).split("\\s+")
         idx = 0
         for j in range(max_sequence_length-len(words), max_sequence_length, 1):
             word = words[idx]
@@ -27,7 +27,7 @@ def convert_sentences_to_inputs(sentences, word_to_index_map, max_sequence_lengt
 
 
 def binary_to_categorical(bin):
-    x = np.zeros((len(bin), 3))
+    x = np.zeros((len(bin), 2))
     for i in range(len(bin)):
         x[i, int(bin[i])] = 1.0
     return x
@@ -35,11 +35,9 @@ def binary_to_categorical(bin):
 
 def label_for_row(row):
     if row['controversiality'] > 0 or row['score'] < 0:
-        return 0
-    elif row['score'] > 10:
-        return 2
-    else:
         return 1
+    else:
+        return 0
 
 
 def get_data(max_sequence_length, word_to_index_map, num_validations=25000):
@@ -47,9 +45,8 @@ def get_data(max_sequence_length, word_to_index_map, num_validations=25000):
     print('Loading data...')
     x0 = pd.read_csv('/home/ehallmark/Downloads/comment_comments0.csv', sep=',')
     x1 = pd.read_csv('/home/ehallmark/Downloads/comment_comments1.csv', sep=',')
-    x2 = pd.read_csv('/home/ehallmark/Downloads/comment_comments2.csv', sep=',')
 
-    x = x0.append(x1, ignore_index=True).append(x2, ignore_index=True)
+    x = x0.append(x1, ignore_index=True)
     x = x.sample(frac=1, replace=False)
 
     x_val = x[-num_validations:]
@@ -117,13 +114,13 @@ if __name__ == "__main__":
 
     initial_epoch = 0  # allows resuming training from particular epoch
     word2vec_size = 256  # size of the embedding
-    max_sequence_length = 128  # max number of words to consider in the comment
-    learning_rate = 0.001  # defines the learning rate (initial) for the model
-    decay = 0  # weight decay
+    max_sequence_length = 96  # max number of words to consider in the comment
+    learning_rate = 0.0001  # defines the learning rate (initial) for the model
+    decay = 0.01  # weight decay
     batch_size = 256  # defines the mini batch size
     epochs = 10  # defines the number of full passes through the training data
-    hidden_layer_size = 256  # defines the hidden layer size for the model's layers
-    num_validations = 25000  # defines the number of training cases to set aside for validation
+    hidden_layer_size = 512  # defines the hidden layer size for the model's layers
+    num_validations = 50000  # defines the number of training cases to set aside for validation
 
     # the embedding layer
     word_to_index_map, index_to_word_map = load_word2vec_index_maps(word2vec_index_file)
@@ -142,11 +139,13 @@ if __name__ == "__main__":
     x2 = LSTM(hidden_layer_size, activation='tanh', return_sequences=False)(x2)
 
     model = Dense(hidden_layer_size, activation='tanh')(Concatenate()([x1, x2]))
-    model = Dense(3, activation='softmax')(model)
+    model = Dense(hidden_layer_size, activation='tanh')(model)
+    model = Dense(hidden_layer_size, activation='tanh')(model)
+    model = Dense(2, activation='softmax')(model)
 
     # compile model
     model = Model(inputs=[x1_orig, x2_orig], outputs=model)
-    model.compile(loss="categorical_crossentropy", optimizer=Adam(lr=learning_rate, decay=decay), metrics=['accuracy'])
+    model.compile(loss="binary_crossentropy", optimizer=Adam(lr=learning_rate, decay=decay), metrics=['accuracy'])
     model.summary()
 
     # load training data
