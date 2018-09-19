@@ -14,10 +14,12 @@ def test_model(model, x, y):
 def convert_sentences_to_inputs(sentences, word_to_index_map, max_sequence_length):
     x = np.zeros((len(sentences), max_sequence_length))
     for i in range(len(sentences)):
-        sentence = sentences[i]
+        sentence = sentences.iloc[i]
         words = sentence.lower().split("\\s+")
+        idx = 0
         for j in range(max_sequence_length-len(words), max_sequence_length, 1):
-            word = words[j]
+            word = words[idx]
+            idx += 1
             if word in word_to_index_map:
                 x[i, j] = word_to_index_map[word]+1  # don't forget to add 1 to account for mask at index 0
     return x
@@ -50,7 +52,7 @@ def get_data(max_sequence_length, word_to_index_map, num_validations=25000):
     x = x.sample(frac=1, replace=False)
 
     x_val = x[-num_validations:]
-    x = x[0:num_validations]
+    x = x[0:-num_validations]
 
     print('Train shape:', x.shape)
     print('Val shape: ', x_val.shape)
@@ -58,12 +60,15 @@ def get_data(max_sequence_length, word_to_index_map, num_validations=25000):
     y = binary_to_categorical(np.array([label_for_row(row) for _, row in x.iterrows()]).astype(np.int32))
     y_val = binary_to_categorical(np.array([label_for_row(row) for _, row in x_val.iterrows()]).astype(np.int32))
 
+    print('Converting sentences for training data...')
     x1 = convert_sentences_to_inputs(x['parent_text'], word_to_index_map, max_sequence_length)
     x2 = convert_sentences_to_inputs(x['text'], word_to_index_map, max_sequence_length)
 
+    print('Converting sentences for validation data...')
     x1_val = convert_sentences_to_inputs(x_val['parent_text'], word_to_index_map, max_sequence_length)
     x2_val = convert_sentences_to_inputs(x_val['text'], word_to_index_map, max_sequence_length)
 
+    print('Finished loading data...')
     return ([x1, x2], y), ([x1_val, x2_val], y_val)
 
 
