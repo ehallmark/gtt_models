@@ -108,14 +108,13 @@ if __name__ == "__main__":
     vocab_vector_file_h5 = '/home/ehallmark/data/python/word2vec256_vectors.h5.npy'  # h5 extension faster? YES by alot
     word2vec_index_file = '/home/ehallmark/data/python/word2vec256_index.txt'
     model_file = '/home/ehallmark/data/python/controversy_model.nn'
-    vocab_size = 477909
 
     initial_epoch = 0  # allows resuming training from particular epoch
     word2vec_size = 256  # size of the embedding
     max_sequence_length = 128  # max number of words to consider in the comment
     learning_rate = 0.001  # defines the learning rate (initial) for the model
     decay = 0  # weight decay
-    batch_size = 512  # defines the mini batch size
+    batch_size = 256  # defines the mini batch size
     epochs = 10  # defines the number of full passes through the training data
     hidden_layer_size = 256  # defines the hidden layer size for the model's layers
     num_validations = 25000  # defines the number of training cases to set aside for validation
@@ -157,8 +156,8 @@ if __name__ == "__main__":
     errors = list()
     errors.append(avg_error)
     for i in range(epochs):
-        model.fit(x, y, batch_size=batch_size, initial_epoch=i, epochs=i + 1, validation_data=data_val,
-                  shuffle=True)
+        model.fit(x, y, batch_size=batch_size, initial_epoch=initial_epoch + i, epochs=initial_epoch + i + 1,
+                  validation_data=data_val, shuffle=True)
         avg_error = test_model(model, data_val[0], data_val[1])
 
         print('Average error: ', avg_error)
