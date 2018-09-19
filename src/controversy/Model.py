@@ -24,22 +24,31 @@ def convert_sentences_to_inputs(sentences, word_to_index_map, max_sequence_lengt
 
 
 def binary_to_categorical(bin):
-    x = np.zeros(len(bin), 2)
+    x = np.zeros(len(bin), 3)
     for i in range(len(bin)):
         x[i, int(bin[i])] = 1.0
     return x
 
 
+def label_for_row(row):
+    if row['controversiality'] > 0 or row['score'] < 0:
+        return 0
+    elif row['score'] > 10:
+        return 2
+    else:
+        return 1
+
+
 def get_data(max_sequence_length, word_to_index_map, num_validations=25000):
     # load the data used to train/validate model
     print('Loading data...')
-    x = pd.read_csv('comment_comments.csv', sep=',').sample(frac=1, replace=False, inplace=True)
+    x = pd.read_csv('/home/ehallmark/Downloads/comment_comments.csv', sep=',').sample(frac=1, replace=False, inplace=True)
 
     x_val = x.iloc[-num_validations:, :]
     x = x.iloc[0:num_validations, :]
 
-    y = binary_to_categorical(np.array([row['controversiality'] > 0 or row['score'] < 0 for row in x.iloc[:]]).astype(np.int32))
-    y_val = binary_to_categorical(np.array([row['controversiality'] > 0 or row['score'] < 0 for row in x_val.iloc[:]]).astype(np.int32))
+    y = binary_to_categorical(np.array([label_for_row(row) for row in x.iloc[:]]).astype(np.int32))
+    y_val = binary_to_categorical(np.array([label_for_row(row) for row in x_val.iloc[:]]).astype(np.int32))
 
     x1 = convert_sentences_to_inputs(x['parent_text'], word_to_index_map, max_sequence_length)
     x2 = convert_sentences_to_inputs(x['text'], word_to_index_map, max_sequence_length)
@@ -126,11 +135,11 @@ if __name__ == "__main__":
     x2 = LSTM(hidden_layer_size, activation='tanh', return_sequences=False)(x2)
 
     model = Dense(hidden_layer_size, activation='tanh')(Concatenate()([x1, x2]))
-    model = Dense(2, activation='softmax')(model)
+    model = Dense(3, activation='softmax')(model)
 
     # compile model
     model = Model(inputs=[x1_orig, x2_orig], outputs=model)
-    model.compile(loss="binary_crossentropy", optimizer=Adam(lr=learning_rate, decay=decay), metrics=['accuracy'])
+    model.compile(loss="categorical_crossentropy", optimizer=Adam(lr=learning_rate, decay=decay), metrics=['accuracy'])
     model.summary()
 
     # train model
