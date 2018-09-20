@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-from keras.layers import Embedding, Reshape, LSTM, Input, Dense, Concatenate, Bidirectional
+from keras.layers import Embedding, Reshape, LSTM, Input, Dense, Concatenate, Bidirectional, BatchNormalization
 from keras.models import Model
 from keras.optimizers import Adam
 from sklearn import metrics
@@ -115,11 +115,12 @@ if __name__ == "__main__":
     initial_epoch = 0  # allows resuming training from particular epoch
     word2vec_size = 256  # size of the embedding
     max_sequence_length = 96  # max number of words to consider in the comment
-    learning_rate = 0.0001  # defines the learning rate (initial) for the model
+    learning_rate = 0.00001  # defines the learning rate (initial) for the model
     decay = 0.01  # weight decay
     batch_size = 256  # defines the mini batch size
     epochs = 10  # defines the number of full passes through the training data
     hidden_layer_size = 512  # defines the hidden layer size for the model's layers
+    ff_hidden_layer_size = 2048
     num_validations = 50000  # defines the number of training cases to set aside for validation
 
     # the embedding layer
@@ -138,9 +139,12 @@ if __name__ == "__main__":
     x1 = LSTM(hidden_layer_size, activation='tanh', return_sequences=False)(x1)
     x2 = LSTM(hidden_layer_size, activation='tanh', return_sequences=False)(x2)
 
-    model = Dense(hidden_layer_size, activation='tanh')(Concatenate()([x1, x2]))
-    model = Dense(hidden_layer_size, activation='tanh')(model)
-    model = Dense(hidden_layer_size, activation='tanh')(model)
+    model = Dense(ff_hidden_layer_size, activation='tanh')(Concatenate()([x1, x2]))
+    model = BatchNormalization()(model)
+    model = Dense(ff_hidden_layer_size, activation='tanh')(model)
+    model = BatchNormalization()(model)
+    model = Dense(ff_hidden_layer_size, activation='tanh')(model)
+    model = BatchNormalization()(model)
     model = Dense(2, activation='softmax')(model)
 
     # compile model
