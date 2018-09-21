@@ -1,9 +1,10 @@
 import numpy as np
 import pandas as pd
-from keras.layers import Embedding, Reshape, LSTM, Input, Dense, Concatenate, Bidirectional, BatchNormalization
+from keras.layers import Embedding, Reshape, LSTM, Input, Dense, Concatenate, Bidirectional, BatchNormalization, Lambda
 from keras.models import Model
 from keras.optimizers import Adam
 from sklearn import metrics
+from keras.utils import to_categorical
 from sklearn.preprocessing import OneHotEncoder
 import re
 
@@ -14,10 +15,7 @@ def test_model(model, x, y):
 
 
 def convert_sentences_to_inputs(sentences, word_to_index_map, max_sequence_length, one_hot=False):
-    if one_hot:
-        x = np.zeros((len(sentences), len(word_to_index_map), max_sequence_length))
-    else:
-        x = np.zeros((len(sentences), max_sequence_length))
+    x = np.zeros((len(sentences), max_sequence_length))
     for i in range(len(sentences)):
         sentence = sentences.iloc[i]
         words = re.sub(r'\W+', ' ', str(sentence).lower()).split(" ")
@@ -27,11 +25,11 @@ def convert_sentences_to_inputs(sentences, word_to_index_map, max_sequence_lengt
             idx += 1
             if word in word_to_index_map:
                 if one_hot:
-                    x[i, word_to_index_map[word], j] = 1.0  # don't forget to add 1 to account for mask at index 0
+                    x[i, j] = word_to_index_map[word]  # don't forget to add 1 to account for mask at index 0
                 else:
                     x[i, j] = word_to_index_map[word] + 1  # don't forget to add 1 to account for mask at index 0
+    # reshape for embedding layer
     if not one_hot:
-        # reshape for embedding layer
         x = x.reshape((len(sentences), max_sequence_length, 1))
     return x
 
@@ -163,6 +161,9 @@ if __name__ == "__main__":
     # build model
     x1_orig = Input(shape=(max_sequence_length, 1), dtype=np.int32)
     x2_orig = Input(shape=(max_sequence_length, 1), dtype=np.int32)
+    x3_orig = Input(shape=(max_sequence_length, 10000), dtype=np.float32)
+    x4_orig = Input(shape=(max_sequence_length, 10000), dtype=np.float32)
+    x5_orig = Input(shape=(1,), dtype=np.float32)
 
     x1 = embedding_layer(x1_orig)
     x2 = embedding_layer(x2_orig)
@@ -171,8 +172,10 @@ if __name__ == "__main__":
 
     x1 = LSTM(hidden_layer_size, activation='tanh', return_sequences=False)(x1)
     x2 = LSTM(hidden_layer_size, activation='tanh', return_sequences=False)(x2)
+    x3 = LSTM(hidden_layer_size, activation='tanh', return_sequences=False)(x3_orig)
+    x4 = LSTM(hidden_layer_size, activation='tanh', return_sequences=False)(x4_orig)
 
-    model = Dense(ff_hidden_layer_size, activation='tanh')(Concatenate()([x1, x2]))
+    model = Dense(ff_hidden_layer_size, activation='tanh')(Concatenate()([x1, x2, x3, x4, x5_orig]))
     model = BatchNormalization()(model)
     model = Dense(ff_hidden_layer_size, activation='tanh')(model)
     model = BatchNormalization()(model)
@@ -181,7 +184,7 @@ if __name__ == "__main__":
     model = Dense(2, activation='softmax')(model)
 
     # compile model
-    model = Model(inputs=[x1_orig, x2_orig], outputs=model)
+    model = Model(inputs=[x1_orig, x2_orig, x3_orig, x4_orig, x5_orig], outputs=model)
     model.compile(loss="binary_crossentropy", optimizer=Adam(lr=learning_rate, decay=decay), metrics=['accuracy'])
     model.summary()
 
