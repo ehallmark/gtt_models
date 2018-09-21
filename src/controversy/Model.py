@@ -100,7 +100,7 @@ def generator(data, y, dictionary_index_map, batch_size=256):
         x5_batch = np.empty((batch_size, *data[0].shape[1:]))
         y_batch = np.empty((batch_size, *y.shape[1:]))
         for i in range(batch_size):
-            r = random.randint(0, data.shape[0])
+            r = random.randint(0, data[0].shape[0])
             x1_batch[r] = data[0][r]
             x2_batch[r] = data[1][r]
             x3_batch[r] = data[2][r]
