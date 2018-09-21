@@ -4,6 +4,7 @@ from keras.layers import Embedding, Reshape, LSTM, Input, Dense, Concatenate, Bi
 from keras.models import Model
 from keras.optimizers import Adam
 from sklearn import metrics
+import numpy.random as random
 from keras.utils import to_categorical
 from sklearn.preprocessing import OneHotEncoder
 import re
@@ -20,7 +21,7 @@ def convert_sentences_to_inputs(sentences, word_to_index_map, max_sequence_lengt
     else:
         x = np.zeros((len(sentences), max_sequence_length))
     for i in range(len(sentences)):
-        sentence = sentences.iloc[i]
+        sentence = sentences[i]
         words = re.sub(r'\W+', ' ', str(sentence).lower()).split(" ")
         idx = 0
         for j in range(max(0, max_sequence_length-len(words)), max_sequence_length, 1):
@@ -36,6 +37,7 @@ def convert_sentences_to_inputs(sentences, word_to_index_map, max_sequence_lengt
         x = x.reshape((len(sentences), max_sequence_length, 1))
     return x
 
+
 def binary_to_categorical(bin):
     x = np.zeros((len(bin), 2))
     for i in range(len(bin)):
@@ -50,7 +52,7 @@ def label_for_row(row):
         return 0
 
 
-def generator(max_sequence_length, word_to_index_map, num_validations=25000, batch_size=256):
+def get_pre_data(max_sequence_length, word_to_index_map, dictionary_index_map, num_validations=25000):
     # load the data used to train/validate model
     print('Loading data...')
     x0 = pd.read_csv('/home/ehallmark/Downloads/comment_comments0.csv', sep=',')
@@ -72,43 +74,45 @@ def generator(max_sequence_length, word_to_index_map, num_validations=25000, bat
     x1 = convert_sentences_to_inputs(x['parent_text'], word_to_index_map, max_sequence_length)
     x2 = convert_sentences_to_inputs(x['text'], word_to_index_map, max_sequence_length)
 
+    x3 = x['parent_text']
+    x4 = x['text']
+
     print('Converting sentences for validation data...')
     x1_val = convert_sentences_to_inputs(x_val['parent_text'], word_to_index_map, max_sequence_length)
     x2_val = convert_sentences_to_inputs(x_val['text'], word_to_index_map, max_sequence_length)
 
+    print('Converting sentences for validation data...')
+    x3_val = convert_sentences_to_inputs(x_val['parent_text'], dictionary_index_map, max_sequence_length, True)
+    x4_val = convert_sentences_to_inputs(x_val['text'], dictionary_index_map, max_sequence_length, True)
+
     x5 = x['parent_score']
     x5_val = x_val['parent_score']
-    
-    # get word data
-    words = pd.read_csv('/home/ehallmark/Downloads/words.csv', sep=',')['word'].values
-    print('Words', words[0:10])
 
-    dictionary_index_map = {}
-    for i in range(len(words)):
-        dictionary_index_map[words[i]] = i
+    return ([x1, x2, x3, x4, x5], y), ([x1_val, x2_val, x3_val, x4_val, x5_val], y_val)
 
+
+def generator(data, y, dictionary_index_map, batch_size=256):
     while True:
-        wipo_encod_sample = np.zeros([batch_size, len(wipo_encoder.classes_)])
-        cpc_encod_sample = np.zeros([batch_size, len(cpc_encoder.classes_)])
+        x1_batch = np.empty((batch_size, *data[0].shape[1:]))
+        x2_batch = np.empty((batch_size, *data[0].shape[1:]))
+        x3_batch = np.empty((batch_size, *data[0].shape[1:]))
+        x4_batch = np.empty((batch_size, *data[0].shape[1:]))
+        x5_batch = np.empty((batch_size, *data[0].shape[1:]))
+        y_batch = np.empty((batch_size, *y.shape[1:]))
         for i in range(batch_size):
             r = random.randint(0, data.shape[0])
-            wipo_encod_sample[i] = wipo_encod[r]
-            cpc = cpc_encoder.transform(data['tree'].iloc[r])
-            for j in range(len(cpc)):
-                cpc_encod_sample[i, cpc[j]] = 1
-        yield(cpc_encod_sample, wipo_encod_sample)
+            x1_batch[r] = data[0][r]
+            x2_batch[r] = data[1][r]
+            x3_batch[r] = data[2][r]
+            x4_batch[r] = data[3][r]
+            x5_batch[r] = data[4][r]
 
         print('Converting sentences for training data...')
-        x3 = convert_sentences_to_inputs(x['parent_text'], dictionary_index_map, max_sequence_length, True)
-        x4 = convert_sentences_to_inputs(x['text'], dictionary_index_map, max_sequence_length, True)
-
-        print('Converting sentences for validation data...')
-        x3_val = convert_sentences_to_inputs(x_val['parent_text'], dictionary_index_map, max_sequence_length, True)
-        x4_val = convert_sentences_to_inputs(x_val['text'], dictionary_index_map, max_sequence_length, True)
-
+        x3_batch = convert_sentences_to_inputs(x3_batch, dictionary_index_map, max_sequence_length, True)
+        x4_batch = convert_sentences_to_inputs(x4_batch, dictionary_index_map, max_sequence_length, True)
 
         print('Finished loading data...')
-        yield ([x1, x2, x3, x4, x5], y), ([x1_val, x2_val, x3_val, x4_val, x5_val], y_val)
+        yield [x1_batch, x2_batch, x3_batch, x4_batch, x5_batch], y_batch
 
 
 def load_word2vec_index_maps(word2vec_index_file):
@@ -163,7 +167,7 @@ if __name__ == "__main__":
     hidden_layer_size = 512  # defines the hidden layer size for the model's layers
     ff_hidden_layer_size = 2048
     num_validations = 50000  # defines the number of training cases to set aside for validation
-    dictionary_size = 5000
+    dictionary_size = 10000
 
     # the embedding layer
     word_to_index_map, index_to_word_map = load_word2vec_index_maps(word2vec_index_file)
@@ -199,9 +203,17 @@ if __name__ == "__main__":
     model.compile(loss="binary_crossentropy", optimizer=Adam(lr=learning_rate, decay=decay), metrics=['accuracy'])
     model.summary()
 
-    # load training data
+    # get word data
+    words = pd.read_csv('/home/ehallmark/Downloads/words.csv', sep=',')['word'].values
+    print('Words', words[0:10])
+
+    dictionary_index_map = {}
+    for i in range(len(words)):
+        dictionary_index_map[words[i]] = i
+
     print('Getting data...')
-    (data, data_val) = get_data(max_sequence_length, word_to_index_map, num_validations)
+    # load training data
+    (data, data_val) = get_pre_data(max_sequence_length, word_to_index_map, dictionary_index_map, num_validations)
 
     x, y = data
 
@@ -215,7 +227,7 @@ if __name__ == "__main__":
     for i in range(epochs):
         #model.fit(x, y, batch_size=batch_size, initial_epoch=initial_epoch + i, epochs=initial_epoch + i + 1,
         #          validation_data=data_val, shuffle=True)
-        model.fit_generator(generator(batch_size), steps_per_epoch=x[0].shape[0]/batch_size, initial_epoch=i,
+        model.fit_generator(generator(x, y, batch_size, dictionary_index_map), steps_per_epoch=x[0].shape[0]/batch_size, initial_epoch=i,
                             epochs=i + 1, validation_data=data_val)
 
         avg_error = test_model(model, data_val[0], data_val[1])
