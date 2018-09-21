@@ -15,7 +15,10 @@ def test_model(model, x, y):
 
 
 def convert_sentences_to_inputs(sentences, word_to_index_map, max_sequence_length, one_hot=False):
-    x = np.zeros((len(sentences), max_sequence_length))
+    if one_hot:
+        x = np.zeros((len(sentences), max_sequence_length, len(word_to_index_map)))
+    else:
+        x = np.zeros((len(sentences), max_sequence_length))
     for i in range(len(sentences)):
         sentence = sentences.iloc[i]
         words = re.sub(r'\W+', ' ', str(sentence).lower()).split(" ")
@@ -25,7 +28,7 @@ def convert_sentences_to_inputs(sentences, word_to_index_map, max_sequence_lengt
             idx += 1
             if word in word_to_index_map:
                 if one_hot:
-                    x[i, j] = word_to_index_map[word]  # don't forget to add 1 to account for mask at index 0
+                    x[i, j, word_to_index_map[word]] = 1.0
                 else:
                     x[i, j] = word_to_index_map[word] + 1  # don't forget to add 1 to account for mask at index 0
     # reshape for embedding layer
@@ -47,7 +50,7 @@ def label_for_row(row):
         return 0
 
 
-def get_data(max_sequence_length, word_to_index_map, num_validations=25000):
+def generator(max_sequence_length, word_to_index_map, num_validations=25000, batch_size=256):
     # load the data used to train/validate model
     print('Loading data...')
     x0 = pd.read_csv('/home/ehallmark/Downloads/comment_comments0.csv', sep=',')
@@ -58,27 +61,6 @@ def get_data(max_sequence_length, word_to_index_map, num_validations=25000):
 
     x_val = x[-num_validations:]
     x = x[0:-num_validations]
-
-
-
-    # get word data
-    words = pd.read_csv('/home/ehallmark/Downloads/words.csv', sep=',')['word'].values
-    print('Words', words[0:10])
-
-    dictionary_index_map = {}
-    for i in range(len(words)):
-        dictionary_index_map[words[i]] = i
-
-    print('Converting sentences for training data...')
-    x3 = convert_sentences_to_inputs(x['parent_text'], dictionary_index_map, max_sequence_length, True)
-    x4 = convert_sentences_to_inputs(x['text'], dictionary_index_map, max_sequence_length, True)
-
-    print('Converting sentences for validation data...')
-    x3_val = convert_sentences_to_inputs(x_val['parent_text'], dictionary_index_map, max_sequence_length, True)
-    x4_val = convert_sentences_to_inputs(x_val['text'], dictionary_index_map, max_sequence_length, True)
-
-
-
 
     print('Train shape:', x.shape)
     print('Val shape: ', x_val.shape)
@@ -96,9 +78,37 @@ def get_data(max_sequence_length, word_to_index_map, num_validations=25000):
 
     x5 = x['parent_score']
     x5_val = x_val['parent_score']
+    
+    # get word data
+    words = pd.read_csv('/home/ehallmark/Downloads/words.csv', sep=',')['word'].values
+    print('Words', words[0:10])
 
-    print('Finished loading data...')
-    return ([x1, x2, x3, x4, x5], y), ([x1_val, x2_val, x3_val, x4_val, x5_val], y_val)
+    dictionary_index_map = {}
+    for i in range(len(words)):
+        dictionary_index_map[words[i]] = i
+
+    while True:
+        wipo_encod_sample = np.zeros([batch_size, len(wipo_encoder.classes_)])
+        cpc_encod_sample = np.zeros([batch_size, len(cpc_encoder.classes_)])
+        for i in range(batch_size):
+            r = random.randint(0, data.shape[0])
+            wipo_encod_sample[i] = wipo_encod[r]
+            cpc = cpc_encoder.transform(data['tree'].iloc[r])
+            for j in range(len(cpc)):
+                cpc_encod_sample[i, cpc[j]] = 1
+        yield(cpc_encod_sample, wipo_encod_sample)
+
+        print('Converting sentences for training data...')
+        x3 = convert_sentences_to_inputs(x['parent_text'], dictionary_index_map, max_sequence_length, True)
+        x4 = convert_sentences_to_inputs(x['text'], dictionary_index_map, max_sequence_length, True)
+
+        print('Converting sentences for validation data...')
+        x3_val = convert_sentences_to_inputs(x_val['parent_text'], dictionary_index_map, max_sequence_length, True)
+        x4_val = convert_sentences_to_inputs(x_val['text'], dictionary_index_map, max_sequence_length, True)
+
+
+        print('Finished loading data...')
+        yield ([x1, x2, x3, x4, x5], y), ([x1_val, x2_val, x3_val, x4_val, x5_val], y_val)
 
 
 def load_word2vec_index_maps(word2vec_index_file):
@@ -145,7 +155,7 @@ if __name__ == "__main__":
 
     initial_epoch = 0  # allows resuming training from particular epoch
     word2vec_size = 256  # size of the embedding
-    max_sequence_length = 96  # max number of words to consider in the comment
+    max_sequence_length = 64  # max number of words to consider in the comment
     learning_rate = 0.00001  # defines the learning rate (initial) for the model
     decay = 0.01  # weight decay
     batch_size = 256  # defines the mini batch size
@@ -153,6 +163,7 @@ if __name__ == "__main__":
     hidden_layer_size = 512  # defines the hidden layer size for the model's layers
     ff_hidden_layer_size = 2048
     num_validations = 50000  # defines the number of training cases to set aside for validation
+    dictionary_size = 5000
 
     # the embedding layer
     word_to_index_map, index_to_word_map = load_word2vec_index_maps(word2vec_index_file)
@@ -161,8 +172,8 @@ if __name__ == "__main__":
     # build model
     x1_orig = Input(shape=(max_sequence_length, 1), dtype=np.int32)
     x2_orig = Input(shape=(max_sequence_length, 1), dtype=np.int32)
-    x3_orig = Input(shape=(max_sequence_length, 10000), dtype=np.float32)
-    x4_orig = Input(shape=(max_sequence_length, 10000), dtype=np.float32)
+    x3_orig = Input(shape=(max_sequence_length, dictionary_size), dtype=np.float32)
+    x4_orig = Input(shape=(max_sequence_length, dictionary_size), dtype=np.float32)
     x5_orig = Input(shape=(1,), dtype=np.float32)
 
     x1 = embedding_layer(x1_orig)
@@ -202,8 +213,11 @@ if __name__ == "__main__":
     errors = list()
     errors.append(avg_error)
     for i in range(epochs):
-        model.fit(x, y, batch_size=batch_size, initial_epoch=initial_epoch + i, epochs=initial_epoch + i + 1,
-                  validation_data=data_val, shuffle=True)
+        #model.fit(x, y, batch_size=batch_size, initial_epoch=initial_epoch + i, epochs=initial_epoch + i + 1,
+        #          validation_data=data_val, shuffle=True)
+        model.fit_generator(generator(batch_size), steps_per_epoch=x[0].shape[0]/batch_size, initial_epoch=i,
+                            epochs=i + 1, validation_data=data_val)
+
         avg_error = test_model(model, data_val[0], data_val[1])
 
         print('Average error: ', avg_error)
