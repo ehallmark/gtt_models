@@ -4,6 +4,7 @@ from keras.layers import Embedding, Reshape, LSTM, Input, Dense, Concatenate, Bi
 from keras.models import Model
 from keras.optimizers import Adam
 from sklearn import metrics
+from sklearn.preprocessing import OneHotEncoder
 import re
 
 
@@ -12,19 +13,27 @@ def test_model(model, x, y):
     return metrics.log_loss(y, y_pred)
 
 
-def convert_sentences_to_inputs(sentences, word_to_index_map, max_sequence_length):
-    x = np.zeros((len(sentences), max_sequence_length))
+def convert_sentences_to_inputs(sentences, word_to_index_map, max_sequence_length, one_hot=False):
+    if one_hot:
+        x = np.zeros((len(sentences), len(word_to_index_map), max_sequence_length))
+    else:
+        x = np.zeros((len(sentences), max_sequence_length))
     for i in range(len(sentences)):
         sentence = sentences.iloc[i]
-        words = re.sub(r'\W+', ' ', str(sentence).lower()).split("\\s+")
+        words = re.sub(r'\W+', ' ', str(sentence).lower()).split(" ")
         idx = 0
-        for j in range(max_sequence_length-len(words), max_sequence_length, 1):
+        for j in range(max(0, max_sequence_length-len(words)), max_sequence_length, 1):
             word = words[idx]
             idx += 1
             if word in word_to_index_map:
-                x[i, j] = word_to_index_map[word]+1  # don't forget to add 1 to account for mask at index 0
-    return x.reshape((len(sentences), max_sequence_length, 1))
-
+                if one_hot:
+                    x[i, word_to_index_map[word], j] = 1.0  # don't forget to add 1 to account for mask at index 0
+                else:
+                    x[i, j] = word_to_index_map[word] + 1  # don't forget to add 1 to account for mask at index 0
+    if not one_hot:
+        # reshape for embedding layer
+        x = x.reshape((len(sentences), max_sequence_length, 1))
+    return x
 
 def binary_to_categorical(bin):
     x = np.zeros((len(bin), 2))
@@ -52,6 +61,27 @@ def get_data(max_sequence_length, word_to_index_map, num_validations=25000):
     x_val = x[-num_validations:]
     x = x[0:-num_validations]
 
+
+
+    # get word data
+    words = pd.read_csv('/home/ehallmark/Downloads/words.csv', sep=',')['word'].values
+    print('Words', words[0:10])
+
+    dictionary_index_map = {}
+    for i in range(len(words)):
+        dictionary_index_map[words[i]] = i
+
+    print('Converting sentences for training data...')
+    x3 = convert_sentences_to_inputs(x['parent_text'], dictionary_index_map, max_sequence_length, True)
+    x4 = convert_sentences_to_inputs(x['text'], dictionary_index_map, max_sequence_length, True)
+
+    print('Converting sentences for validation data...')
+    x3_val = convert_sentences_to_inputs(x_val['parent_text'], dictionary_index_map, max_sequence_length, True)
+    x4_val = convert_sentences_to_inputs(x_val['text'], dictionary_index_map, max_sequence_length, True)
+
+
+
+
     print('Train shape:', x.shape)
     print('Val shape: ', x_val.shape)
 
@@ -66,8 +96,11 @@ def get_data(max_sequence_length, word_to_index_map, num_validations=25000):
     x1_val = convert_sentences_to_inputs(x_val['parent_text'], word_to_index_map, max_sequence_length)
     x2_val = convert_sentences_to_inputs(x_val['text'], word_to_index_map, max_sequence_length)
 
+    x5 = x['parent_score']
+    x5_val = x_val['parent_score']
+
     print('Finished loading data...')
-    return ([x1, x2], y), ([x1_val, x2_val], y_val)
+    return ([x1, x2, x3, x4, x5], y), ([x1_val, x2_val, x3_val, x4_val, x5_val], y_val)
 
 
 def load_word2vec_index_maps(word2vec_index_file):
