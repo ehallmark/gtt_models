@@ -7,6 +7,7 @@ from sklearn import metrics
 import numpy.random as random
 from keras.utils import to_categorical
 from sklearn.preprocessing import OneHotEncoder
+import scipy.sparse
 import re
 
 
@@ -16,10 +17,7 @@ def test_model(model, x, y):
 
 
 def convert_sentences_to_inputs(sentences, word_to_index_map, max_sequence_length, one_hot=False):
-    if one_hot:
-        x = np.zeros((len(sentences), max_sequence_length, len(word_to_index_map)))
-    else:
-        x = np.zeros((len(sentences), max_sequence_length))
+    x = np.zeros((len(sentences), max_sequence_length))
     for i in range(len(sentences)):
         sentence = sentences[i]
         words = re.sub(r'\W+', ' ', str(sentence).lower()).split(" ")
@@ -29,7 +27,7 @@ def convert_sentences_to_inputs(sentences, word_to_index_map, max_sequence_lengt
             idx += 1
             if word in word_to_index_map:
                 if one_hot:
-                    x[i, j, word_to_index_map[word]] = 1.0
+                    x[i, j] = word_to_index_map[word]
                 else:
                     x[i, j] = word_to_index_map[word] + 1  # don't forget to add 1 to account for mask at index 0
     # reshape for embedding layer
@@ -64,6 +62,20 @@ def get_pre_data(max_sequence_length, word_to_index_map, dictionary_index_map, n
     x_val = x[-num_validations:]
     x = x[0:-num_validations]
 
+
+    
+
+    print('Converting sentences for validation data...')
+    x3_val = convert_sentences_to_inputs(x_val['parent_text'].iloc[:], dictionary_index_map, max_sequence_length, True)
+    enc = OneHotEncoder(n_values=10000)
+    x4_val = convert_sentences_to_inputs(x_val['text'].iloc[:], dictionary_index_map, max_sequence_length, True)
+    x3_val = np.vstack([enc.transform(row) for _, row in x3_val.iterrows()])
+    x4_val = np.vstack([enc.transform(row) for _, row in x4_val.iterrows()])
+
+
+
+
+
     print('Train shape:', x.shape)
     print('Val shape: ', x_val.shape)
 
@@ -71,19 +83,16 @@ def get_pre_data(max_sequence_length, word_to_index_map, dictionary_index_map, n
     y_val = binary_to_categorical(np.array([label_for_row(row) for _, row in x_val.iterrows()]).astype(np.int32))
 
     print('Converting sentences for training data...')
-    x1 = convert_sentences_to_inputs(x['parent_text'].values, word_to_index_map, max_sequence_length)
-    x2 = convert_sentences_to_inputs(x['text'].values, word_to_index_map, max_sequence_length)
+    x1 = convert_sentences_to_inputs(x['parent_text'].iloc[:], word_to_index_map, max_sequence_length)
+    x2 = convert_sentences_to_inputs(x['text'].iloc[:], word_to_index_map, max_sequence_length)
 
     x3 = x['parent_text']
     x4 = x['text']
 
     print('Converting sentences for validation data...')
-    x1_val = convert_sentences_to_inputs(x_val['parent_text'].values, word_to_index_map, max_sequence_length)
-    x2_val = convert_sentences_to_inputs(x_val['text'].values, word_to_index_map, max_sequence_length)
+    x1_val = convert_sentences_to_inputs(x_val['parent_text'].iloc[:], word_to_index_map, max_sequence_length)
+    x2_val = convert_sentences_to_inputs(x_val['text'].iloc[:], word_to_index_map, max_sequence_length)
 
-    print('Converting sentences for validation data...')
-    x3_val = convert_sentences_to_inputs(x_val['parent_text'].values, dictionary_index_map, max_sequence_length, True)
-    x4_val = convert_sentences_to_inputs(x_val['text'].values, dictionary_index_map, max_sequence_length, True)
 
     x5 = x['parent_score']
     x5_val = x_val['parent_score']
@@ -92,6 +101,7 @@ def get_pre_data(max_sequence_length, word_to_index_map, dictionary_index_map, n
 
 
 def generator(data, y, dictionary_index_map, batch_size=256):
+    enc = OneHotEncoder(n_values=10000)
     while True:
         x1_batch = np.empty((batch_size, *data[0].shape[1:]))
         x2_batch = np.empty((batch_size, *data[0].shape[1:]))
@@ -110,6 +120,9 @@ def generator(data, y, dictionary_index_map, batch_size=256):
         print('Converting sentences for training data...')
         x3_batch = convert_sentences_to_inputs(x3_batch, dictionary_index_map, max_sequence_length, True)
         x4_batch = convert_sentences_to_inputs(x4_batch, dictionary_index_map, max_sequence_length, True)
+
+        x3_batch = np.vstack([enc.transform(row) for _, row in x3_batch.iterrows()])
+        x4_batch = np.vstack([enc.transform(row) for _, row in x4_batch.iterrows()])
 
         print('Finished loading data...')
         yield [x1_batch, x2_batch, x3_batch, x4_batch, x5_batch], y_batch
