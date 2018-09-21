@@ -71,19 +71,19 @@ def get_pre_data(max_sequence_length, word_to_index_map, dictionary_index_map, n
     y_val = binary_to_categorical(np.array([label_for_row(row) for _, row in x_val.iterrows()]).astype(np.int32))
 
     print('Converting sentences for training data...')
-    x1 = convert_sentences_to_inputs(x['parent_text'], word_to_index_map, max_sequence_length)
-    x2 = convert_sentences_to_inputs(x['text'], word_to_index_map, max_sequence_length)
+    x1 = convert_sentences_to_inputs(x['parent_text'].values, word_to_index_map, max_sequence_length)
+    x2 = convert_sentences_to_inputs(x['text'].values, word_to_index_map, max_sequence_length)
 
     x3 = x['parent_text']
     x4 = x['text']
 
     print('Converting sentences for validation data...')
-    x1_val = convert_sentences_to_inputs(x_val['parent_text'], word_to_index_map, max_sequence_length)
-    x2_val = convert_sentences_to_inputs(x_val['text'], word_to_index_map, max_sequence_length)
+    x1_val = convert_sentences_to_inputs(x_val['parent_text'].values, word_to_index_map, max_sequence_length)
+    x2_val = convert_sentences_to_inputs(x_val['text'].values, word_to_index_map, max_sequence_length)
 
     print('Converting sentences for validation data...')
-    x3_val = convert_sentences_to_inputs(x_val['parent_text'], dictionary_index_map, max_sequence_length, True)
-    x4_val = convert_sentences_to_inputs(x_val['text'], dictionary_index_map, max_sequence_length, True)
+    x3_val = convert_sentences_to_inputs(x_val['parent_text'].values, dictionary_index_map, max_sequence_length, True)
+    x4_val = convert_sentences_to_inputs(x_val['text'].values, dictionary_index_map, max_sequence_length, True)
 
     x5 = x['parent_score']
     x5_val = x_val['parent_score']
