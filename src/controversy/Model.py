@@ -13,7 +13,7 @@ import re
 
 vocab_vector_file_h5 = '/home/ehallmark/data/python/word2vec256_vectors.h5.npy'  # h5 extension faster? YES by alot
 word2vec_index_file = '/home/ehallmark/data/python/word2vec256_index.txt'
-model_file = '/home/ehallmark/data/python/controversy_model.nn'
+model_file = '/home/ehallmark/data/python/controversy_model_ff_only.nn'
 max_sequence_length = 64  # max number of words to consider in the comment
 
 
@@ -100,12 +100,12 @@ def get_pre_data(max_sequence_length, word_to_index_map, dictionary_index_map, n
     y_val = binary_to_categorical(np.array([label_for_row(row) for _, row in x_val.iterrows()]).astype(np.int32))
 
     print('Converting sentences for training data...')
-    x1 = convert_sentences_to_rnn(x['parent_text'], word_to_index_map, max_sequence_length)
-    x2 = convert_sentences_to_rnn(x['text'], word_to_index_map, max_sequence_length)
+   # x1 = convert_sentences_to_rnn(x['parent_text'], word_to_index_map, max_sequence_length)
+   # x2 = convert_sentences_to_rnn(x['text'], word_to_index_map, max_sequence_length)
 
     print('Converting sentences for validation data...')
-    x1_val = convert_sentences_to_rnn(x_val['parent_text'], word_to_index_map, max_sequence_length)
-    x2_val = convert_sentences_to_rnn(x_val['text'], word_to_index_map, max_sequence_length)
+   # x1_val = convert_sentences_to_rnn(x_val['parent_text'], word_to_index_map, max_sequence_length)
+   # x2_val = convert_sentences_to_rnn(x_val['text'], word_to_index_map, max_sequence_length)
 
     print('Converting sentences for training data...')
     x3 = convert_sentences_to_ff(x['parent_text'], dictionary_index_map)
@@ -118,7 +118,10 @@ def get_pre_data(max_sequence_length, word_to_index_map, dictionary_index_map, n
     x5 = x['parent_score']
     x5_val = x_val['parent_score']
 
-    return ([x1, x2, x3, x4, x5], y), ([x1_val, x2_val, x3_val, x4_val, x5_val], y_val)
+    return ([#x1, x2,
+        x3, x4, x5], y), ([
+        #x1_val, x2_val,
+         x3_val, x4_val, x5_val], y_val)
 
 
 def load_word2vec_index_maps(word2vec_index_file):
@@ -176,23 +179,25 @@ if __name__ == "__main__":
     embedding_layer = load_word2vec_model_layer(model_file=vocab_vector_file_h5, sequence_length=max_sequence_length)
 
     # build model
-    x1_orig = Input(shape=(max_sequence_length, 1), dtype=np.int32)
-    x2_orig = Input(shape=(max_sequence_length, 1), dtype=np.int32)
+    #x1_orig = Input(shape=(max_sequence_length, 1), dtype=np.int32)
+    #x2_orig = Input(shape=(max_sequence_length, 1), dtype=np.int32)
     x3_orig = Input(shape=(dictionary_size,), dtype=np.float32)
     x4_orig = Input(shape=(dictionary_size,), dtype=np.float32)
     x5_orig = Input(shape=(1,), dtype=np.float32)
 
-    x1 = embedding_layer(x1_orig)
-    x2 = embedding_layer(x2_orig)
-    x1 = Reshape((max_sequence_length, word2vec_size))(x1)
-    x2 = Reshape((max_sequence_length, word2vec_size))(x2)
+    #x1 = embedding_layer(x1_orig)
+    #x2 = embedding_layer(x2_orig)
+    #x1 = Reshape((max_sequence_length, word2vec_size))(x1)
+    #x2 = Reshape((max_sequence_length, word2vec_size))(x2)
 
-    x1 = LSTM(hidden_layer_size, activation='tanh', return_sequences=False)(x1)
-    x2 = LSTM(hidden_layer_size, activation='tanh', return_sequences=False)(x2)
+    #x1 = LSTM(hidden_layer_size, activation='tanh', return_sequences=False)(x1)
+    #x2 = LSTM(hidden_layer_size, activation='tanh', return_sequences=False)(x2)
     x3 = Dense(ff_hidden_layer_size, activation='tanh')(x3_orig)
     x4 = Dense(ff_hidden_layer_size, activation='tanh')(x4_orig)
 
-    model = Dense(ff_hidden_layer_size, activation='tanh')(Concatenate()([x1, x2, x3, x4, x5_orig]))
+    model = Dense(ff_hidden_layer_size, activation='tanh')(Concatenate()([
+        #x1, x2,
+        x3, x4, x5_orig]))
     model = BatchNormalization()(model)
     model = Dense(ff_hidden_layer_size, activation='tanh')(model)
     model = BatchNormalization()(model)
@@ -201,7 +206,9 @@ if __name__ == "__main__":
     model = Dense(2, activation='softmax')(model)
 
     # compile model
-    model = Model(inputs=[x1_orig, x2_orig, x3_orig, x4_orig, x5_orig], outputs=model)
+    model = Model(inputs=[
+        #x1_orig, x2_orig,
+        x3_orig, x4_orig, x5_orig], outputs=model)
     model.compile(loss="binary_crossentropy", optimizer=Adam(lr=learning_rate, decay=decay), metrics=['accuracy'])
     model.summary()
 
