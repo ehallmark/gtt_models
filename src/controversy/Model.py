@@ -11,6 +11,12 @@ import scipy.sparse
 import re
 
 
+vocab_vector_file_h5 = '/home/ehallmark/data/python/word2vec256_vectors.h5.npy'  # h5 extension faster? YES by alot
+word2vec_index_file = '/home/ehallmark/data/python/word2vec256_index.txt'
+model_file = '/home/ehallmark/data/python/controversy_model.nn'
+max_sequence_length = 64  # max number of words to consider in the comment
+
+
 def test_model(model, x, y):
     y_pred = model.predict(x)
     return metrics.log_loss(y, y_pred)
@@ -115,30 +121,6 @@ def get_pre_data(max_sequence_length, word_to_index_map, dictionary_index_map, n
     return ([x1, x2, x3, x4, x5], y), ([x1_val, x2_val, x3_val, x4_val, x5_val], y_val)
 
 
-def generator(data, y, dictionary_index_map, batch_size=256):
-    while True:
-        x1_batch = np.empty((batch_size, *data[0].shape[1:]))
-        x2_batch = np.empty((batch_size, *data[0].shape[1:]))
-        x3_batch = np.empty((batch_size, *data[0].shape[1:]))
-        x4_batch = np.empty((batch_size, *data[0].shape[1:]))
-        x5_batch = np.empty((batch_size, *data[0].shape[1:]))
-        y_batch = np.empty((batch_size, *y.shape[1:]))
-        for i in range(batch_size):
-            r = random.randint(0, data[0].shape[0])
-            x1_batch[r] = data[0][r]
-            x2_batch[r] = data[1][r]
-            x3_batch[r] = data[2][r]
-            x4_batch[r] = data[3][r]
-            x5_batch[r] = data[4][r]
-
-        print('Converting sentences for training data...')
-        x3_batch = convert_sentences_to_ff(x3_batch, dictionary_index_map)
-        x4_batch = convert_sentences_to_ff(x4_batch, dictionary_index_map)
-
-        print('Finished loading data...')
-        yield [x1_batch, x2_batch, x3_batch, x4_batch, x5_batch], y_batch
-
-
 def load_word2vec_index_maps(word2vec_index_file):
     word2vec_index = np.array(pd.read_csv(word2vec_index_file, delimiter=',', header=None))
     word_to_index_map = {}
@@ -177,10 +159,6 @@ def load_word2vec_model_layer(model_file, sequence_length):
 
 
 if __name__ == "__main__":
-    vocab_vector_file_h5 = '/home/ehallmark/data/python/word2vec256_vectors.h5.npy'  # h5 extension faster? YES by alot
-    word2vec_index_file = '/home/ehallmark/data/python/word2vec256_index.txt'
-    model_file = '/home/ehallmark/data/python/controversy_model.nn'
-
     initial_epoch = 0  # allows resuming training from particular epoch
     word2vec_size = 256  # size of the embedding
     max_sequence_length = 64  # max number of words to consider in the comment
