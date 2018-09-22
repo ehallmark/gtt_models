@@ -47,9 +47,9 @@ if __name__ == '__main__':
 
     # samples
     samples = [
-        ['', '', -10],
-        ['', '', 100],
-
+        [" Are *you* retarded?  You missed the point.  He's saying that it isn't just about women's rights, but also about the rights of the father.  Yes, its her right, but where does the other half the child's chromosomes fit into the picture? | &gt; where does the other half the child's chromosomes fit into the picture?\r ", "They fit rather neatly into the mother's uterus. If they were somewhere else, abortion wouldn't be her business either.\r", 5],
+        ["Do you remember the feeling of frustration when your girlfriend pisses you off, disappoints you, or just plain annoys you? Well, no more of that. It's all about you when you're single. Time for yourself, reconnect with friends, and the bachelor life.", "LAN PARTY TIME!", 74],
+        ["I'm building a gaming computer -- she's never been into gaming, so I'm taking this opportunity to spend money on stuff I never could have justified before.", "Just steer clear of the opiate called \"World of Warcraft\" if you are easily addicted to stuff...", 65]
     ]
 
     for sample in samples:
