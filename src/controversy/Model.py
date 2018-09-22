@@ -87,13 +87,6 @@ def get_pre_data(max_sequence_length, word_to_index_map, dictionary_index_map, n
     x_val = x[-num_validations:]
     x = x[0:-num_validations]
 
-    x3 = convert_sentences_to_ff(x['parent_text'], dictionary_index_map)
-    x4 = convert_sentences_to_ff(x['text'], dictionary_index_map)
-
-    print('Converting sentences for validation data...')
-    x3_val = convert_sentences_to_ff(x_val['parent_text'], dictionary_index_map)
-    x4_val = convert_sentences_to_ff(x_val['text'], dictionary_index_map)
-
     print('Train shape:', x.shape)
     print('Val shape: ', x_val.shape)
 
@@ -107,6 +100,14 @@ def get_pre_data(max_sequence_length, word_to_index_map, dictionary_index_map, n
     print('Converting sentences for validation data...')
     x1_val = convert_sentences_to_rnn(x_val['parent_text'], word_to_index_map, max_sequence_length)
     x2_val = convert_sentences_to_rnn(x_val['text'], word_to_index_map, max_sequence_length)
+
+    print('Converting sentences for training data...')
+    x3 = convert_sentences_to_ff(x['parent_text'], dictionary_index_map)
+    x4 = convert_sentences_to_ff(x['text'], dictionary_index_map)
+
+    print('Converting sentences for validation data...')
+    x3_val = convert_sentences_to_ff(x_val['parent_text'], dictionary_index_map)
+    x4_val = convert_sentences_to_ff(x_val['text'], dictionary_index_map)
 
     x5 = x['parent_score']
     x5_val = x_val['parent_score']
