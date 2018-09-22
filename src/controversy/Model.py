@@ -16,7 +16,7 @@ def test_model(model, x, y):
     return metrics.log_loss(y, y_pred)
 
 
-def convert_sentences_to_inputs(sentences, word_to_index_map, max_sequence_length, one_hot=False):
+def convert_sentences_to_rnn(sentences, word_to_index_map, max_sequence_length):
     x = np.zeros((len(sentences), max_sequence_length))
     for i in range(len(sentences)):
         sentence = sentences[i]
@@ -26,13 +26,32 @@ def convert_sentences_to_inputs(sentences, word_to_index_map, max_sequence_lengt
             word = words[idx]
             idx += 1
             if word in word_to_index_map:
-                if one_hot:
-                    x[i, j] = word_to_index_map[word]
-                else:
-                    x[i, j] = word_to_index_map[word] + 1  # don't forget to add 1 to account for mask at index 0
+                x[i, j] = word_to_index_map[word] + 1  # don't forget to add 1 to account for mask at index 0
     # reshape for embedding layer
-    if not one_hot:
-        x = x.reshape((len(sentences), max_sequence_length, 1))
+    x = x.reshape((len(sentences), max_sequence_length, 1))
+    return x
+
+
+def convert_sentences_to_ff(sentences, word_to_index_map):
+    x = np.zeros((len(sentences), len(word_to_index_map)))
+    for i in range(len(sentences)):
+        sentence = sentences[i]
+        words = re.sub(r'\W+', ' ', str(sentence).lower()).split(" ")
+        sum = 0
+        indices = []
+        for word_idx in range(len(words)):
+            word = words[word_idx]
+            if word in word_to_index_map:
+                idx = word_to_index_map[word]
+                indices.append(idx)
+                x[i, idx] += 1.0  # don't forget to add 1 to account for mask at index 0
+                sum += 1
+        if sum > 0:
+            for idx in indices:
+                x[i, idx] /= sum
+
+    # reshape for embedding layer
+    x = x.reshape((len(sentences), max_sequence_length, 1))
     return x
 
 
@@ -62,19 +81,9 @@ def get_pre_data(max_sequence_length, word_to_index_map, dictionary_index_map, n
     x_val = x[-num_validations:]
     x = x[0:-num_validations]
 
-
-    
-
     print('Converting sentences for validation data...')
-    x3_val = convert_sentences_to_inputs(x_val['parent_text'].iloc[:], dictionary_index_map, max_sequence_length, True)
-    enc = OneHotEncoder(n_values=10000)
-    x4_val = convert_sentences_to_inputs(x_val['text'].iloc[:], dictionary_index_map, max_sequence_length, True)
-    x3_val = np.vstack([enc.transform(row) for _, row in x3_val.iterrows()])
-    x4_val = np.vstack([enc.transform(row) for _, row in x4_val.iterrows()])
-
-
-
-
+    x3_val = convert_sentences_to_ff(x_val['parent_text'].values, dictionary_index_map)
+    x4_val = convert_sentences_to_ff(x_val['text'].values, dictionary_index_map)
 
     print('Train shape:', x.shape)
     print('Val shape: ', x_val.shape)
@@ -83,15 +92,15 @@ def get_pre_data(max_sequence_length, word_to_index_map, dictionary_index_map, n
     y_val = binary_to_categorical(np.array([label_for_row(row) for _, row in x_val.iterrows()]).astype(np.int32))
 
     print('Converting sentences for training data...')
-    x1 = convert_sentences_to_inputs(x['parent_text'].iloc[:], word_to_index_map, max_sequence_length)
-    x2 = convert_sentences_to_inputs(x['text'].iloc[:], word_to_index_map, max_sequence_length)
+    x1 = convert_sentences_to_rnn(x['parent_text'].iloc[:], word_to_index_map, max_sequence_length)
+    x2 = convert_sentences_to_rnn(x['text'].iloc[:], word_to_index_map, max_sequence_length)
 
     x3 = x['parent_text']
     x4 = x['text']
 
     print('Converting sentences for validation data...')
-    x1_val = convert_sentences_to_inputs(x_val['parent_text'].iloc[:], word_to_index_map, max_sequence_length)
-    x2_val = convert_sentences_to_inputs(x_val['text'].iloc[:], word_to_index_map, max_sequence_length)
+    x1_val = convert_sentences_to_rnn(x_val['parent_text'].iloc[:], word_to_index_map, max_sequence_length)
+    x2_val = convert_sentences_to_rnn(x_val['text'].iloc[:], word_to_index_map, max_sequence_length)
 
 
     x5 = x['parent_score']
@@ -118,8 +127,8 @@ def generator(data, y, dictionary_index_map, batch_size=256):
             x5_batch[r] = data[4][r]
 
         print('Converting sentences for training data...')
-        x3_batch = convert_sentences_to_inputs(x3_batch, dictionary_index_map, max_sequence_length, True)
-        x4_batch = convert_sentences_to_inputs(x4_batch, dictionary_index_map, max_sequence_length, True)
+        x3_batch = convert_sentences_to_ff(x3_batch, dictionary_index_map)
+        x4_batch = convert_sentences_to_ff(x4_batch, dictionary_index_map)
 
         x3_batch = np.vstack([enc.transform(row) for _, row in x3_batch.iterrows()])
         x4_batch = np.vstack([enc.transform(row) for _, row in x4_batch.iterrows()])
@@ -189,8 +198,8 @@ if __name__ == "__main__":
     # build model
     x1_orig = Input(shape=(max_sequence_length, 1), dtype=np.int32)
     x2_orig = Input(shape=(max_sequence_length, 1), dtype=np.int32)
-    x3_orig = Input(shape=(max_sequence_length, dictionary_size), dtype=np.float32)
-    x4_orig = Input(shape=(max_sequence_length, dictionary_size), dtype=np.float32)
+    x3_orig = Input(shape=(dictionary_size,), dtype=np.float32)
+    x4_orig = Input(shape=(dictionary_size,), dtype=np.float32)
     x5_orig = Input(shape=(1,), dtype=np.float32)
 
     x1 = embedding_layer(x1_orig)
@@ -200,8 +209,8 @@ if __name__ == "__main__":
 
     x1 = LSTM(hidden_layer_size, activation='tanh', return_sequences=False)(x1)
     x2 = LSTM(hidden_layer_size, activation='tanh', return_sequences=False)(x2)
-    x3 = LSTM(hidden_layer_size, activation='tanh', return_sequences=False)(x3_orig)
-    x4 = LSTM(hidden_layer_size, activation='tanh', return_sequences=False)(x4_orig)
+    x3 = Dense(ff_hidden_layer_size, activation='tanh')(x3_orig)
+    x4 = Dense(ff_hidden_layer_size, activation='tanh')(x4_orig)
 
     model = Dense(ff_hidden_layer_size, activation='tanh')(Concatenate()([x1, x2, x3, x4, x5_orig]))
     model = BatchNormalization()(model)
