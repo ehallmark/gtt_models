@@ -17,9 +17,12 @@ def test_model(model, x, y):
 
 
 def convert_sentences_to_rnn(sentences, word_to_index_map, max_sequence_length):
-    x = np.zeros((len(sentences), max_sequence_length))
+    x = np.zeros((sentences.shape[0], max_sequence_length))
     for i in range(len(sentences)):
-        sentence = sentences[i]
+        if hasattr(sentences, 'iloc'):
+            sentence = sentences.iloc[i]
+        else:
+            sentence = sentences[i]
         words = re.sub(r'\W+', ' ', str(sentence).lower()).split(" ")
         idx = 0
         for j in range(max(0, max_sequence_length-len(words)), max_sequence_length, 1):
@@ -33,9 +36,12 @@ def convert_sentences_to_rnn(sentences, word_to_index_map, max_sequence_length):
 
 
 def convert_sentences_to_ff(sentences, word_to_index_map):
-    x = np.zeros((len(sentences), len(word_to_index_map)))
+    x = np.zeros((sentences.shape[0], len(word_to_index_map)))
     for i in range(len(sentences)):
-        sentence = sentences[i]
+        if hasattr(sentences, 'iloc'):
+            sentence = sentences.iloc[i]
+        else:
+            sentence = sentences[i]
         words = re.sub(r'\W+', ' ', str(sentence).lower()).split(" ")
         sum = 0
         indices = []
@@ -51,7 +57,7 @@ def convert_sentences_to_ff(sentences, word_to_index_map):
                 x[i, idx] /= sum
 
     # reshape for embedding layer
-    x = x.reshape((len(sentences), max_sequence_length, 1))
+    x = x.reshape((len(sentences), len(word_to_index_map)))
     return x
 
 
@@ -81,9 +87,12 @@ def get_pre_data(max_sequence_length, word_to_index_map, dictionary_index_map, n
     x_val = x[-num_validations:]
     x = x[0:-num_validations]
 
+    x3 = convert_sentences_to_ff(x['parent_text'], dictionary_index_map)
+    x4 = convert_sentences_to_ff(x['text'], dictionary_index_map)
+
     print('Converting sentences for validation data...')
-    x3_val = convert_sentences_to_ff(x_val['parent_text'].values, dictionary_index_map)
-    x4_val = convert_sentences_to_ff(x_val['text'].values, dictionary_index_map)
+    x3_val = convert_sentences_to_ff(x_val['parent_text'], dictionary_index_map)
+    x4_val = convert_sentences_to_ff(x_val['text'], dictionary_index_map)
 
     print('Train shape:', x.shape)
     print('Val shape: ', x_val.shape)
@@ -92,16 +101,12 @@ def get_pre_data(max_sequence_length, word_to_index_map, dictionary_index_map, n
     y_val = binary_to_categorical(np.array([label_for_row(row) for _, row in x_val.iterrows()]).astype(np.int32))
 
     print('Converting sentences for training data...')
-    x1 = convert_sentences_to_rnn(x['parent_text'].iloc[:], word_to_index_map, max_sequence_length)
-    x2 = convert_sentences_to_rnn(x['text'].iloc[:], word_to_index_map, max_sequence_length)
-
-    x3 = x['parent_text']
-    x4 = x['text']
+    x1 = convert_sentences_to_rnn(x['parent_text'], word_to_index_map, max_sequence_length)
+    x2 = convert_sentences_to_rnn(x['text'], word_to_index_map, max_sequence_length)
 
     print('Converting sentences for validation data...')
-    x1_val = convert_sentences_to_rnn(x_val['parent_text'].iloc[:], word_to_index_map, max_sequence_length)
-    x2_val = convert_sentences_to_rnn(x_val['text'].iloc[:], word_to_index_map, max_sequence_length)
-
+    x1_val = convert_sentences_to_rnn(x_val['parent_text'], word_to_index_map, max_sequence_length)
+    x2_val = convert_sentences_to_rnn(x_val['text'], word_to_index_map, max_sequence_length)
 
     x5 = x['parent_score']
     x5_val = x_val['parent_score']
@@ -110,7 +115,6 @@ def get_pre_data(max_sequence_length, word_to_index_map, dictionary_index_map, n
 
 
 def generator(data, y, dictionary_index_map, batch_size=256):
-    enc = OneHotEncoder(n_values=10000)
     while True:
         x1_batch = np.empty((batch_size, *data[0].shape[1:]))
         x2_batch = np.empty((batch_size, *data[0].shape[1:]))
@@ -129,9 +133,6 @@ def generator(data, y, dictionary_index_map, batch_size=256):
         print('Converting sentences for training data...')
         x3_batch = convert_sentences_to_ff(x3_batch, dictionary_index_map)
         x4_batch = convert_sentences_to_ff(x4_batch, dictionary_index_map)
-
-        x3_batch = np.vstack([enc.transform(row) for _, row in x3_batch.iterrows()])
-        x4_batch = np.vstack([enc.transform(row) for _, row in x4_batch.iterrows()])
 
         print('Finished loading data...')
         yield [x1_batch, x2_batch, x3_batch, x4_batch, x5_batch], y_batch
@@ -247,10 +248,10 @@ if __name__ == "__main__":
     errors = list()
     errors.append(avg_error)
     for i in range(epochs):
-        #model.fit(x, y, batch_size=batch_size, initial_epoch=initial_epoch + i, epochs=initial_epoch + i + 1,
-        #          validation_data=data_val, shuffle=True)
-        model.fit_generator(generator(x, y, batch_size, dictionary_index_map), steps_per_epoch=x[0].shape[0]/batch_size, initial_epoch=i,
-                            epochs=i + 1, validation_data=data_val)
+        model.fit(x, y, batch_size=batch_size, initial_epoch=initial_epoch + i, epochs=initial_epoch + i + 1,
+                  validation_data=data_val, shuffle=True)
+        #model.fit_generator(generator(x, y, batch_size, dictionary_index_map), steps_per_epoch=x[0].shape[0]/batch_size, initial_epoch=i,
+        #                    epochs=i + 1, validation_data=data_val)
 
         avg_error = test_model(model, data_val[0], data_val[1])
 
