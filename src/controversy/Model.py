@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 from keras.layers import Embedding, Reshape, LSTM, Input, Dense, Concatenate, Bidirectional, BatchNormalization, Lambda
+from keras.preprocessing.text import Tokenizer
 from keras.models import Model
 from keras.optimizers import Adam
 from sklearn import metrics
@@ -21,8 +22,12 @@ def test_model(model, x, y):
 
 
 def convert_sentences_to_rnn(sentences, word_to_index_map, max_sequence_length):
-    x = np.zeros((sentences.shape[0], max_sequence_length))
-    for i in range(sentences.shape[0]):
+    if hasattr(sentences, 'size'):
+        length = sentences.size
+    else:
+        length = sentences.shape[0]
+    x = np.zeros((length, max_sequence_length))
+    for i in range(length):
         if hasattr(sentences, 'iloc'):
             sentence = sentences.iloc[i]
         else:
@@ -40,8 +45,12 @@ def convert_sentences_to_rnn(sentences, word_to_index_map, max_sequence_length):
 
 
 def convert_sentences_to_ff(sentences, word_to_index_map):
-    x = lil_matrix((sentences.shape[0], len(word_to_index_map)), dtype=np.float32)
-    for i in range(sentences.shape[0]):
+    if hasattr(sentences, 'size'):
+        length = sentences.size
+    else:
+        length = sentences.shape[0]
+    x = np.zeros((length, len(word_to_index_map)), dtype=np.float32)
+    for i in range(length):
         if hasattr(sentences, 'iloc'):
             sentence = sentences.iloc[i]
         else:
@@ -90,12 +99,12 @@ def get_pre_data(max_sequence_length, word_to_index_map, dictionary_index_map, n
     x = x[0:-num_validations]
 
     print('Converting sentences for training data...')
-    x3 = convert_sentences_to_ff(x['parent_text'], dictionary_index_map)
-    x4 = convert_sentences_to_ff(x['text'], dictionary_index_map)
+    x3 = convert_sentences_to_ff(x['parent_text'].iloc[:], dictionary_index_map)
+    x4 = convert_sentences_to_ff(x['text'].iloc[:], dictionary_index_map)
 
     print('Converting sentences for validation data...')
-    x3_val = convert_sentences_to_ff(x_val['parent_text'], dictionary_index_map)
-    x4_val = convert_sentences_to_ff(x_val['text'], dictionary_index_map)
+    x3_val = convert_sentences_to_ff(x_val['parent_text'].iloc[:], dictionary_index_map)
+    x4_val = convert_sentences_to_ff(x_val['text'].iloc[:], dictionary_index_map)
 
     print('Train shape:', x.shape)
     print('Val shape: ', x_val.shape)
@@ -189,7 +198,6 @@ if __name__ == "__main__":
         x2_orig = Input(shape=(max_sequence_length, 1), dtype=np.int32)
         x3_orig = Input(shape=(dictionary_size,), dtype=np.float32)
         x4_orig = Input(shape=(dictionary_size,), dtype=np.float32)
-        x5_orig = Input(shape=(1,), dtype=np.float32)
 
         x1 = embedding_layer(x1_orig)
         x2 = embedding_layer(x2_orig)
