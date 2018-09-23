@@ -5,7 +5,7 @@ from keras.models import Model
 from keras.optimizers import Adam
 from sklearn import metrics
 import keras as k
-from scipy.sparse import csr_matrix
+from scipy.sparse import csr_matrix, lil_matrix
 import re
 
 
@@ -22,7 +22,7 @@ def test_model(model, x, y):
 
 def convert_sentences_to_rnn(sentences, word_to_index_map, max_sequence_length):
     x = np.zeros((sentences.shape[0], max_sequence_length))
-    for i in range(len(sentences)):
+    for i in range(sentences.shape[0]):
         if hasattr(sentences, 'iloc'):
             sentence = sentences.iloc[i]
         else:
@@ -40,8 +40,8 @@ def convert_sentences_to_rnn(sentences, word_to_index_map, max_sequence_length):
 
 
 def convert_sentences_to_ff(sentences, word_to_index_map):
-    x = csr_matrix((sentences.shape[0], len(word_to_index_map)), dtype=np.float32)
-    for i in range(len(sentences)):
+    x = lil_matrix((sentences.shape[0], len(word_to_index_map)), dtype=np.float32)
+    for i in range(sentences.shape[0]):
         if hasattr(sentences, 'iloc'):
             sentence = sentences.iloc[i]
         else:
@@ -54,7 +54,7 @@ def convert_sentences_to_ff(sentences, word_to_index_map):
             if word in word_to_index_map:
                 idx = word_to_index_map[word]
                 indices.append(idx)
-                x[i, idx] += 1.0  # don't forget to add 1 to account for mask at index 0
+                x[i, idx] += 1.0
                 sum += 1
         if sum > 0:
             for idx in indices:
@@ -89,6 +89,14 @@ def get_pre_data(max_sequence_length, word_to_index_map, dictionary_index_map, n
     x_val = x[-num_validations:]
     x = x[0:-num_validations]
 
+    print('Converting sentences for training data...')
+    x3 = convert_sentences_to_ff(x['parent_text'], dictionary_index_map)
+    x4 = convert_sentences_to_ff(x['text'], dictionary_index_map)
+
+    print('Converting sentences for validation data...')
+    x3_val = convert_sentences_to_ff(x_val['parent_text'], dictionary_index_map)
+    x4_val = convert_sentences_to_ff(x_val['text'], dictionary_index_map)
+
     print('Train shape:', x.shape)
     print('Val shape: ', x_val.shape)
 
@@ -102,14 +110,6 @@ def get_pre_data(max_sequence_length, word_to_index_map, dictionary_index_map, n
     print('Converting sentences for validation data...')
     x1_val = convert_sentences_to_rnn(x_val['parent_text'], word_to_index_map, max_sequence_length)
     x2_val = convert_sentences_to_rnn(x_val['text'], word_to_index_map, max_sequence_length)
-
-    print('Converting sentences for training data...')
-    x3 = convert_sentences_to_ff(x['parent_text'], dictionary_index_map)
-    x4 = convert_sentences_to_ff(x['text'], dictionary_index_map)
-
-    print('Converting sentences for validation data...')
-    x3_val = convert_sentences_to_ff(x_val['parent_text'], dictionary_index_map)
-    x4_val = convert_sentences_to_ff(x_val['text'], dictionary_index_map)
 
     return ([x1, x2, x3, x4], y), ([x1_val, x2_val, x3_val, x4_val], y_val)
 
@@ -153,8 +153,8 @@ def load_word2vec_model_layer(model_file, sequence_length):
 
 if __name__ == "__main__":
     # get word data
-    words = pd.read_csv('/home/ehallmark/Downloads/words.csv', sep=',')['word'].values
-    print('Words', words[0:10])
+    words = list(set(pd.read_csv('/home/ehallmark/Downloads/words.csv', sep=',')['word'].tolist()))
+    print('Num words: ', len(words))
 
     dictionary_index_map = {}
     for i in range(len(words)):
@@ -168,10 +168,14 @@ if __name__ == "__main__":
     batch_size = 512  # defines the mini batch size
     epochs = 10  # defines the number of full passes through the training data
     hidden_layer_size = 256  # defines the hidden layer size for the model's layers
-    ff_hidden_layer_size = 2048
+    ff_hidden_layer_size = 4096
     num_validations = 50000  # defines the number of training cases to set aside for validation
     dictionary_size = len(dictionary_index_map)
     use_previous_model = False
+
+    if dictionary_size != len(words):
+        print("Invalid dictionary size:", dictionary_size)
+        exit(1)
 
     word_to_index_map, index_to_word_map = load_word2vec_index_maps(word2vec_index_file)
 
@@ -197,10 +201,7 @@ if __name__ == "__main__":
         x3 = Dense(ff_hidden_layer_size, activation='tanh')(x3_orig)
         x4 = Dense(ff_hidden_layer_size, activation='tanh')(x4_orig)
 
-        model = Dense(ff_hidden_layer_size, activation='tanh')(Concatenate()([
-            x1, x2,
-            x3, x4#, x5_orig
-         ]))
+        model = Dense(ff_hidden_layer_size, activation='tanh')(Concatenate()([x1, x2, x3, x4]))
         model = BatchNormalization()(model)
         model = Dense(ff_hidden_layer_size, activation='tanh')(model)
         model = BatchNormalization()(model)
@@ -209,10 +210,8 @@ if __name__ == "__main__":
         model = Dense(2, activation='softmax')(model)
 
         # compile model
-        model = Model(inputs=[
-            x1_orig, x2_orig,
-            x3_orig, x4_orig#, x5_orig
-         ], outputs=model)
+        model = Model(inputs=[x1_orig, x2_orig, x3_orig, x4_orig], outputs=model)
+
     else:
         print("Using previous model file:", model_file)
         model = k.models.load_model(model_file, compile=False)
