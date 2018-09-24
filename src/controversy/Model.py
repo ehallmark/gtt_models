@@ -12,7 +12,7 @@ import re
 
 vocab_vector_file_h5 = '/home/ehallmark/data/python/word2vec256_vectors.h5.npy'  # h5 extension faster? YES by alot
 word2vec_index_file = '/home/ehallmark/data/python/word2vec256_index.txt'
-model_file = '/home/ehallmark/data/python/controversy_model.nn'
+model_file = '/home/ehallmark/data/python/controversy_model_rnn.nn'
 max_sequence_length = 64  # max number of words to consider in the comment
 
 
@@ -86,7 +86,7 @@ def label_for_row(row):
         return 0
 
 
-def get_pre_data(max_sequence_length, word_to_index_map, dictionary_index_map, num_validations=25000):
+def get_pre_data(max_sequence_length, word_to_index_map, dictionary_index_map, use_ff=True, use_rnn=True, num_validations=25000):
     # load the data used to train/validate model
     print('Loading data...')
     x0 = pd.read_csv('/home/ehallmark/Downloads/comment_comments0.csv', sep=',')
@@ -98,29 +98,41 @@ def get_pre_data(max_sequence_length, word_to_index_map, dictionary_index_map, n
     x_val = x[-num_validations:]
     x = x[0:-num_validations]
 
-    print('Converting sentences for training data...')
-    x3 = convert_sentences_to_ff(x['parent_text'].iloc[:], dictionary_index_map)
-    x4 = convert_sentences_to_ff(x['text'].iloc[:], dictionary_index_map)
-
-    print('Converting sentences for validation data...')
-    x3_val = convert_sentences_to_ff(x_val['parent_text'].iloc[:], dictionary_index_map)
-    x4_val = convert_sentences_to_ff(x_val['text'].iloc[:], dictionary_index_map)
-
     print('Train shape:', x.shape)
     print('Val shape: ', x_val.shape)
 
     y = binary_to_categorical(np.array([label_for_row(row) for _, row in x.iterrows()]).astype(np.int32))
     y_val = binary_to_categorical(np.array([label_for_row(row) for _, row in x_val.iterrows()]).astype(np.int32))
 
-    print('Converting sentences for training data...')
-    x1 = convert_sentences_to_rnn(x['parent_text'], word_to_index_map, max_sequence_length)
-    x2 = convert_sentences_to_rnn(x['text'], word_to_index_map, max_sequence_length)
+    x_trains = []
+    x_vals = []
+    if use_rnn:
+        print('Converting sentences for training data...')
+        x1 = convert_sentences_to_rnn(x['parent_text'], word_to_index_map, max_sequence_length)
+        x2 = convert_sentences_to_rnn(x['text'], word_to_index_map, max_sequence_length)
+        x_trains.append(x1)
+        x_trains.append(x2)
 
-    print('Converting sentences for validation data...')
-    x1_val = convert_sentences_to_rnn(x_val['parent_text'], word_to_index_map, max_sequence_length)
-    x2_val = convert_sentences_to_rnn(x_val['text'], word_to_index_map, max_sequence_length)
+        print('Converting sentences for validation data...')
+        x1_val = convert_sentences_to_rnn(x_val['parent_text'], word_to_index_map, max_sequence_length)
+        x2_val = convert_sentences_to_rnn(x_val['text'], word_to_index_map, max_sequence_length)
+        x_vals.append(x1_val)
+        x_vals.append(x2_val)
 
-    return ([x1, x2, x3, x4], y), ([x1_val, x2_val, x3_val, x4_val], y_val)
+    if use_ff:
+        print('Converting sentences for training data...')
+        x3 = convert_sentences_to_ff(x['parent_text'].iloc[:], dictionary_index_map)
+        x4 = convert_sentences_to_ff(x['text'].iloc[:], dictionary_index_map)
+        x_trains.append(x3)
+        x_trains.append(x4)
+
+        print('Converting sentences for validation data...')
+        x3_val = convert_sentences_to_ff(x_val['parent_text'].iloc[:], dictionary_index_map)
+        x4_val = convert_sentences_to_ff(x_val['text'].iloc[:], dictionary_index_map)
+        x_vals.append(x3_val)
+        x_vals.append(x4_val)
+
+    return (x_trains, y), (x_vals, y_val)
 
 
 def load_word2vec_index_maps(word2vec_index_file):
@@ -181,6 +193,8 @@ if __name__ == "__main__":
     num_validations = 50000  # defines the number of training cases to set aside for validation
     dictionary_size = len(dictionary_index_map)
     use_previous_model = False
+    use_ff = False
+    use_rnn = True
 
     if dictionary_size != len(words):
         print("Invalid dictionary size:", dictionary_size)
@@ -189,27 +203,37 @@ if __name__ == "__main__":
     word_to_index_map, index_to_word_map = load_word2vec_index_maps(word2vec_index_file)
 
     if not use_previous_model:
-        # the embedding layer
-        embedding_layer = load_word2vec_model_layer(model_file=vocab_vector_file_h5,
-                                                    sequence_length=max_sequence_length)
-
         # build model
-        x1_orig = Input(shape=(max_sequence_length, 1), dtype=np.int32)
-        x2_orig = Input(shape=(max_sequence_length, 1), dtype=np.int32)
-        x3_orig = Input(shape=(dictionary_size,), dtype=np.float32)
-        x4_orig = Input(shape=(dictionary_size,), dtype=np.float32)
+        inputs = []
+        concat = []
+        if use_rnn:
+            # the embedding layer
+            embedding_layer = load_word2vec_model_layer(model_file=vocab_vector_file_h5,
+                                                        sequence_length=max_sequence_length)
+            x1_orig = Input(shape=(max_sequence_length, 1), dtype=np.int32)
+            x2_orig = Input(shape=(max_sequence_length, 1), dtype=np.int32)
+            x1 = embedding_layer(x1_orig)
+            x2 = embedding_layer(x2_orig)
+            x1 = Reshape((max_sequence_length, word2vec_size))(x1)
+            x2 = Reshape((max_sequence_length, word2vec_size))(x2)
+            x1 = LSTM(hidden_layer_size, activation='tanh', return_sequences=False)(x1)
+            x2 = LSTM(hidden_layer_size, activation='tanh', return_sequences=False)(x2)
+            concat.append(x1)
+            concat.append(x2)
+            inputs.append(x1_orig)
+            inputs.append(x2_orig)
 
-        x1 = embedding_layer(x1_orig)
-        x2 = embedding_layer(x2_orig)
-        x1 = Reshape((max_sequence_length, word2vec_size))(x1)
-        x2 = Reshape((max_sequence_length, word2vec_size))(x2)
+        if use_ff:
+            x3_orig = Input(shape=(dictionary_size,), dtype=np.float32)
+            x4_orig = Input(shape=(dictionary_size,), dtype=np.float32)
+            x3 = Dense(ff_hidden_layer_size, activation='tanh')(x3_orig)
+            x4 = Dense(ff_hidden_layer_size, activation='tanh')(x4_orig)
+            concat.append(x3)
+            concat.append(x4)
+            inputs.append(x3_orig)
+            inputs.append(x4_orig)
 
-        x1 = LSTM(hidden_layer_size, activation='tanh', return_sequences=False)(x1)
-        x2 = LSTM(hidden_layer_size, activation='tanh', return_sequences=False)(x2)
-        x3 = Dense(ff_hidden_layer_size, activation='tanh')(x3_orig)
-        x4 = Dense(ff_hidden_layer_size, activation='tanh')(x4_orig)
-
-        model = Dense(ff_hidden_layer_size, activation='tanh')(Concatenate()([x1, x2, x3, x4]))
+        model = Dense(ff_hidden_layer_size, activation='tanh')(Concatenate()(concat))
         model = BatchNormalization()(model)
         model = Dense(ff_hidden_layer_size, activation='tanh')(model)
         model = BatchNormalization()(model)
@@ -218,7 +242,7 @@ if __name__ == "__main__":
         model = Dense(2, activation='softmax')(model)
 
         # compile model
-        model = Model(inputs=[x1_orig, x2_orig, x3_orig, x4_orig], outputs=model)
+        model = Model(inputs=inputs, outputs=model)
 
     else:
         print("Using previous model file:", model_file)
@@ -229,7 +253,8 @@ if __name__ == "__main__":
 
     print('Getting data...')
     # load training data
-    (data, data_val) = get_pre_data(max_sequence_length, word_to_index_map, dictionary_index_map, num_validations)
+    (data, data_val) = get_pre_data(max_sequence_length, word_to_index_map, dictionary_index_map,
+                                    use_rnn=use_rnn, use_ff=use_ff, num_validations=num_validations)
 
     x, y = data
 

@@ -6,7 +6,7 @@ from src.controversy.Model import convert_sentences_to_ff, convert_sentences_to_
 import pandas as pd
 
 
-model_file = '/home/ehallmark/data/python/controversy_model2.nn'
+model_file = '/home/ehallmark/data/python/controversy_model.nn'
 
 
 def predict_probability_controversial(parent_text, text, parent_comment_score, model, word_to_index_map,
