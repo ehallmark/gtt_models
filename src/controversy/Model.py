@@ -86,7 +86,8 @@ def label_for_row(row):
         return 0
 
 
-def get_pre_data(max_sequence_length, word_to_index_map, dictionary_index_map, use_ff=True, use_rnn=True, num_validations=25000):
+def get_pre_data(max_sequence_length, word_to_index_map, dictionary_index_map, use_ff=True, use_rnn=True,
+                 num_validations=25000, train=True):
     # load the data used to train/validate model
     print('Loading data...')
     x0 = pd.read_csv('/home/ehallmark/Downloads/comment_comments0.csv', sep=',')
@@ -107,11 +108,12 @@ def get_pre_data(max_sequence_length, word_to_index_map, dictionary_index_map, u
     x_trains = []
     x_vals = []
     if use_rnn:
-        print('Converting sentences for training data...')
-        x1 = convert_sentences_to_rnn(x['parent_text'], word_to_index_map, max_sequence_length)
-        x2 = convert_sentences_to_rnn(x['text'], word_to_index_map, max_sequence_length)
-        x_trains.append(x1)
-        x_trains.append(x2)
+        if train:
+            print('Converting sentences for training data...')
+            x1 = convert_sentences_to_rnn(x['parent_text'], word_to_index_map, max_sequence_length)
+            x2 = convert_sentences_to_rnn(x['text'], word_to_index_map, max_sequence_length)
+            x_trains.append(x1)
+            x_trains.append(x2)
 
         print('Converting sentences for validation data...')
         x1_val = convert_sentences_to_rnn(x_val['parent_text'], word_to_index_map, max_sequence_length)
@@ -120,11 +122,12 @@ def get_pre_data(max_sequence_length, word_to_index_map, dictionary_index_map, u
         x_vals.append(x2_val)
 
     if use_ff:
-        print('Converting sentences for training data...')
-        x3 = convert_sentences_to_ff(x['parent_text'].iloc[:], dictionary_index_map)
-        x4 = convert_sentences_to_ff(x['text'].iloc[:], dictionary_index_map)
-        x_trains.append(x3)
-        x_trains.append(x4)
+        if train:
+            print('Converting sentences for training data...')
+            x3 = convert_sentences_to_ff(x['parent_text'].iloc[:], dictionary_index_map)
+            x4 = convert_sentences_to_ff(x['text'].iloc[:], dictionary_index_map)
+            x_trains.append(x3)
+            x_trains.append(x4)
 
         print('Converting sentences for validation data...')
         x3_val = convert_sentences_to_ff(x_val['parent_text'].iloc[:], dictionary_index_map)
@@ -132,8 +135,10 @@ def get_pre_data(max_sequence_length, word_to_index_map, dictionary_index_map, u
         x_vals.append(x3_val)
         x_vals.append(x4_val)
 
-    return (x_trains, y), (x_vals, y_val)
-
+    if train:
+        return (x_trains, y), (x_vals, y_val)
+    else:
+        return x_vals, y_val, x_val['parent_text'], x_val['text']
 
 def load_word2vec_index_maps(word2vec_index_file):
     word2vec_index = np.array(pd.read_csv(word2vec_index_file, delimiter=',', header=None))
@@ -172,6 +177,25 @@ def load_word2vec_model_layer(model_file, sequence_length):
     return embedding_layer
 
 
+def predict_probability_controversial(parent_text, text, model, word_to_index_map,
+                                      max_sequence_length, dictionary, use_ff=True, use_rnn=True):
+    x1 = convert_sentences_to_rnn(np.array([[parent_text]]), word_to_index_map, max_sequence_length)
+    x2 = convert_sentences_to_rnn(np.array([[text]]), word_to_index_map, max_sequence_length)
+    x3 = convert_sentences_to_ff(np.array([[parent_text]]), dictionary)
+    x4 = convert_sentences_to_ff(np.array([[text]]), dictionary)
+    features = []
+    if use_rnn:
+        features.append(x1)
+        features.append(x2)
+
+    if use_ff:
+        features.append(x3)
+        features.append(x4)
+
+    y_hat = model.predict(features)
+    return y_hat[0][1]
+
+
 if __name__ == "__main__":
     # get word data
     words = list(set(pd.read_csv('/home/ehallmark/Downloads/words.csv', sep=',')['word'].tolist()))
@@ -193,6 +217,7 @@ if __name__ == "__main__":
     num_validations = 50000  # defines the number of training cases to set aside for validation
     dictionary_size = len(dictionary_index_map)
     use_previous_model = False
+    train = False
     use_ff = False
     use_rnn = True
 
@@ -252,39 +277,53 @@ if __name__ == "__main__":
     model.summary()
 
     print('Getting data...')
-    # load training data
-    (data, data_val) = get_pre_data(max_sequence_length, word_to_index_map, dictionary_index_map,
-                                    use_rnn=use_rnn, use_ff=use_ff, num_validations=num_validations)
 
-    x, y = data
-
-    # train model
-    avg_error = test_model(model, data_val[0], data_val[1])
-    print("Starting model score: ", avg_error)
-    prev_error = avg_error
-    best_error = avg_error
-    errors = list()
-    errors.append(avg_error)
-    for i in range(epochs):
-        model.fit(x, y, batch_size=batch_size, initial_epoch=initial_epoch + i, epochs=initial_epoch + i + 1,
-                  validation_data=data_val, shuffle=True)
-        #model.fit_generator(generator(x, y, batch_size, dictionary_index_map), steps_per_epoch=x[0].shape[0]/batch_size, initial_epoch=i,
-        #                    epochs=i + 1, validation_data=data_val)
-
+    if train:
+        # load training data
+        (data, data_val) = get_pre_data(max_sequence_length, word_to_index_map, dictionary_index_map,
+                                        use_rnn=use_rnn, use_ff=use_ff, num_validations=num_validations, train=train)
+        x, y = data
+        # train model
         avg_error = test_model(model, data_val[0], data_val[1])
-
-        print('Average error: ', avg_error)
-        if best_error is None or best_error > avg_error:
-            best_error = avg_error
-            # save
-            model.save(model_file)
-            print('Saved.')
+        print("Starting model score: ", avg_error)
         prev_error = avg_error
-        errors.append(prev_error)
+        best_error = avg_error
+        errors = list()
+        errors.append(avg_error)
+        for i in range(epochs):
+            model.fit(x, y, batch_size=batch_size, initial_epoch=initial_epoch + i, epochs=initial_epoch + i + 1,
+                      validation_data=data_val, shuffle=True)
+            #model.fit_generator(generator(x, y, batch_size, dictionary_index_map), steps_per_epoch=x[0].shape[0]/batch_size, initial_epoch=i,
+            #                    epochs=i + 1, validation_data=data_val)
 
-    print(model.summary())
-    print('Most recent model error: ', prev_error)
-    print('Best model error: ', best_error)
-    print("Error history: ", errors)
+            avg_error = test_model(model, data_val[0], data_val[1])
 
+            print('Average error: ', avg_error)
+            if best_error is None or best_error > avg_error:
+                best_error = avg_error
+                # save
+                model.save(model_file)
+                print('Saved.')
+            prev_error = avg_error
+            errors.append(prev_error)
 
+        print(model.summary())
+        print('Most recent model error: ', prev_error)
+        print('Best model error: ', best_error)
+        print("Error history: ", errors)
+
+    else:
+        # predict
+        # load training data
+        data_vals, y_val, parent_text_val, text_val = get_pre_data(max_sequence_length, word_to_index_map, dictionary_index_map,
+                                                           use_rnn=use_rnn, use_ff=use_ff,
+                                                           num_validations=num_validations, train=False)
+        for i in range(len(y_val.shape[0])):
+            print('---------------------------------------------------------------------------------')
+            print("Prediction", i)
+            parent_text, text = parent_text_val.iloc[i], text_val.iloc[i]
+            controversiality_prob = predict_probability_controversial(parent_text, text, model, word_to_index_map,
+                                      max_sequence_length, dictionary_index_map, use_ff=use_ff, use_rnn=use_rnn)
+
+            print('Controversiality: ', controversiality_prob)
+            print('\tOriginal Comment:', parent_text, '\n\tResponse:', text, '\n\n')
