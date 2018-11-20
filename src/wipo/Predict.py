@@ -20,7 +20,7 @@ print('Loading data')
 
 wipo_sql = pd.read_hdf(data_file, 'data')
 cpc_definitions_sql = pd.read_hdf(cpc_definition_file, 'definition')
-data = pd.read_sql('select c.publication_number_full, tree from big_query_wipo_by_pub_flat as w full outer join big_query_cpc_tree as c on (c.publication_number_full=w.publication_number_full) where w.publication_number_full is null', conn)
+data = pd.read_sql('select c.publication_number_full, tree from big_query_wipo_prediction as w full outer join big_query_cpc_tree as c on (c.publication_number_full=w.publication_number_full) where w.publication_number_full is null', conn)
 data['tree'] = [[d for d in dat if len(d) < 8] for dat in data['tree']]
 
 print('Done')
