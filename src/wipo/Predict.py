@@ -79,7 +79,7 @@ while i < data.shape[0]:
         insert_str = '''
             insert into big_query_wipo_prediction (publication_number_full, wipo_technology) 
             values (\'{{LABEL}}\', \'{{VALUE}}\') 
-            on conflict (publication_number_full) do update set wipo_technology=excluded.wipo_technology
+            
             '''.replace("{{LABEL}}", label).replace("{{VALUE}}", prediction)
         cursor.execute(insert_str)
         if j == predictions.shape[0]-1:

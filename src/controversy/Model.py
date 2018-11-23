@@ -12,7 +12,6 @@ import re
 
 vocab_vector_file_h5 = '/home/ehallmark/data/python/word2vec256_vectors.h5.npy'  # h5 extension faster? YES by alot
 word2vec_index_file = '/home/ehallmark/data/python/word2vec256_index.txt'
-model_file = '/home/ehallmark/data/python/controversy_model_rnn.nn'
 max_sequence_length = 64  # max number of words to consider in the comment
 
 
@@ -138,7 +137,7 @@ def get_pre_data(max_sequence_length, word_to_index_map, dictionary_index_map, u
     if train:
         return (x_trains, y), (x_vals, y_val)
     else:
-        return x_vals, y_val, x_val['parent_text'], x_val['text']
+        return x_vals, x_val['score'], x_val['parent_text'], x_val['text']
 
 def load_word2vec_index_maps(word2vec_index_file):
     word2vec_index = np.array(pd.read_csv(word2vec_index_file, delimiter=',', header=None))
@@ -216,10 +215,19 @@ if __name__ == "__main__":
     ff_hidden_layer_size = 4096
     num_validations = 50000  # defines the number of training cases to set aside for validation
     dictionary_size = len(dictionary_index_map)
-    use_previous_model = False
+    use_previous_model = True
     train = False
-    use_ff = False
+    use_ff = True
     use_rnn = True
+
+    if use_ff and use_rnn:
+        model_file = '/home/ehallmark/data/python/controversy_model.nn'
+    elif use_ff:
+        model_file = '/home/ehallmark/data/python/controversy_model_ff.nn'
+    elif use_rnn:
+        model_file = '/home/ehallmark/data/python/controversy_model_rnn.nn'
+    else:
+        raise RuntimeError('must use ff or rnn')
 
     if dictionary_size != len(words):
         print("Invalid dictionary size:", dictionary_size)
@@ -274,10 +282,6 @@ if __name__ == "__main__":
         model = k.models.load_model(model_file, compile=False)
 
     model.compile(loss="binary_crossentropy", optimizer=Adam(lr=learning_rate, decay=decay), metrics=['accuracy'])
-    model.summary()
-
-    print('Getting data...')
-
     if train:
         # load training data
         (data, data_val) = get_pre_data(max_sequence_length, word_to_index_map, dictionary_index_map,
@@ -315,15 +319,15 @@ if __name__ == "__main__":
     else:
         # predict
         # load training data
-        data_vals, y_val, parent_text_val, text_val = get_pre_data(max_sequence_length, word_to_index_map, dictionary_index_map,
+        data_vals, scores_val, parent_text_val, text_val = get_pre_data(max_sequence_length, word_to_index_map, dictionary_index_map,
                                                            use_rnn=use_rnn, use_ff=use_ff,
-                                                           num_validations=num_validations, train=False)
-        for i in range(len(y_val.shape[0])):
+                                                           num_validations=num_validations, train=train)
+        for i in range(num_validations):
             print('---------------------------------------------------------------------------------')
             print("Prediction", i)
             parent_text, text = parent_text_val.iloc[i], text_val.iloc[i]
             controversiality_prob = predict_probability_controversial(parent_text, text, model, word_to_index_map,
                                       max_sequence_length, dictionary_index_map, use_ff=use_ff, use_rnn=use_rnn)
 
-            print('Controversiality: ', controversiality_prob)
+            print('Response Score:', scores_val.iloc[i], ' Guess:', controversiality_prob)
             print('\tOriginal Comment:', parent_text, '\n\tResponse:', text, '\n\n')
